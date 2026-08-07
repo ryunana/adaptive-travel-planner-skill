@@ -2,11 +2,35 @@
 
 [![skills.sh](https://skills.sh/b/ryunana/adaptive-travel-planner-skill)](https://skills.sh/ryunana/adaptive-travel-planner-skill)
 
-一个面向自由行同好的自适应旅行规划 Skill。
+**先选对目的地，再排对行程。**
 
-它不负责把热门景点塞满每一天，而是要求 AI 先确认**你现在在哪里、天气是否适合、景区是否开放、交通是否真实存在、当天是否已经过载**，再比较继续、替换、换城市或下次再来的真实方案。
+给它几个候选地、可用天数和你的旅行边界。它不会立刻生成几份很快过期的详细攻略，而是先做三件事：
 
-> English summary: A reusable Agent Skill for weather-aware, evidence-based and fatigue-aware travel planning. It separates a private traveler profile from the public planning method.
+1. 把大小不一的候选地整理成同一时长内可执行的路线；
+2. 核验天气、开放状态、真实交通和其他会变化的信息，查不到就明确标记；
+3. 先淘汰本次不适合的选项，只为第一名做完整日程，并保留一个可切换的第二名。
+
+结果会给出去向，也会说明为什么、什么条件下不能去、什么时候需要重新查询，以及走累了该怎么停。
+
+> Evidence-based, fatigue-aware travel planning for Agent tools. Private traveler profiles stay local; dynamic facts must be verified or marked unknown.
+
+## 30 秒试用
+
+```bash
+npx skills add ryunana/adaptive-travel-planner-skill -g -a codex -y
+```
+
+安装后可以直接这样问：
+
+```text
+我有 8 天时间，夏天从上海出发，正在考虑北疆、甘南和滇西北。
+先把它们整理成 8 天内可比较的路线，核验天气、交通和人流风险，淘汰不适合本次旅行的选项；
+只为第一名做完整日程，第二名给简要切换路线。查不到的动态信息请标为 unknown 或 login_required，不要估算。
+```
+
+它会先归一化候选路线、检查硬门槛和证据状态，再给出排序。不会为了显得完整而编造票价、余票、天气或开放状态。
+
+想让规划长期贴合你的作息、体力和偏好，可以继续阅读下方的私人画像设置；不使用 Agent Skill 的平台也有可复制的便携提示词。
 
 ## 为什么做这个 Skill
 
@@ -112,13 +136,7 @@ Hermes Agent 可将仓库放到或链接到 `$HERMES_HOME/skills/`（未自定�
 
 适合的请求：
 
-目的地还很模糊时，不必先选定城市，也不必让 AI 同时生成几份很快过期的详细行程。例如：
-
-```text
-我有 8 天时间，夏天从上海出发，正在考虑北疆、甘南和滇西北，但区域大小并不一致。
-先把它们整理成 8 天内可比较的路线，核验天气、交通和人流风险，淘汰不适合本次旅行的选项；
-然后只为第一名做完整日程，并给第二名一条可切换的简要路线。
-```
+目的地还很模糊时，可以直接使用首屏示例：不必先选定城市，也不必让 AI 同时生成几份很快过期的详细行程。下面是其他常见场景。
 
 ```text
 我明天下午从当前酒店出发。比较继续留在这里、去附近室内项目、直接换城市三个方案。
