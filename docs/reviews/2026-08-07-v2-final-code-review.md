@@ -1,151 +1,112 @@
-# V2 Final Code Review
+# V2 Final Code Review — R15–R27 Re-Review
 
 Date: 2026-08-07
 Original verdict: **CHANGES REQUIRED**
-
-Current response status: **PENDING INDEPENDENT RE-REVIEW**
+Current re-review verdict: **CONDITIONALLY APPROVED** (see R24 TOCTOU note)
 
 This review uses only synthetic inputs and public repository contracts. It contains no private traveler data, credentials, internal task identifiers, model identifiers, or development-session paths.
 
-## Verification Baseline
+## Re-Review Scope
 
-The original reviewed baseline passed 53 unit tests, the repository release checker, the 8/8 scenario harness, the 8/8 itinerary harness, and the GitHub Actions security audit. Those green checks did not cover the adversarial cases below; each finding was independently reproduced against that baseline.
+Exact commit: `d739bcb24595b6e6a09797b6977b416a13a151a8`
+Parent: `af46a3a6d02d41266051daa384f83719e8070d56`
+Branch: `agent/china-destination-selection-v2`
+Workspace: clean; main unchanged; remote V2 branch absent; no push.
 
-## Findings
+## Independent Gate Re-Run
 
-### R1 — Critical: hard-gate state can contradict its evidence
+| Gate | Command / Evidence | Verdict |
+|---|---|---|
+| Unit tests | `python3 -m unittest discover -s tests -v` — Ran 88 tests, OK | **PASS** |
+| Release checks | `python3 scripts/release_checks.py` — metadata, 17 resources, links, privacy passed | **PASS** |
+| Ruff | `uvx ruff check scripts tests` — All checks passed! | **PASS** |
+| mypy | `uvx mypy scripts --ignore-missing-imports` — Success: no issues found in 8 source files | **PASS** |
+| compileall | `python3 -m compileall -q scripts tests` — exit 0 | **PASS** |
+| Bandit | `uvx bandit -q -ll -r scripts` — 0 medium/high findings | **PASS** |
+| zizmor | `uvx zizmor .github/workflows/ci.yml` — No findings to report | **PASS** |
+| pip-audit | `uvx --python 3.12 pip-audit -r requirements-release.txt` — No known vulnerabilities found | **PASS** |
+| git diff --check | clean | **PASS** |
+| Luban | `bash skills/luban/tools/check-skill-repo.sh .` — PASS 11 / WARN 2 (marketplace missing, demo GIF) / FAIL 0 | **PASS** |
+| Fresh scenario harness | Regenerated 8 scenarios with timezone-aware timestamps (`queried_at: 2026-08-07T12:00:00+08:00`, `valid_for: YYYY-MM-DD through YYYY-MM-DD`) — 8/8 contract + 8/8 validation | **PASS** |
+| Semantic privacy scan | 4 commits × 192 tree objects; 0 hits on personal markers, local paths, internal task IDs, and prohibited model names | **PASS** |
+| Author/committer identity | All 4 commits: `ryunana <76762767+ryunana@users.noreply.github.com>` | **PASS** |
+| Remote state | `git ls-remote --heads origin agent/china-destination-selection-v2` — no head; main unchanged | **PASS** |
+| detect-secrets | `uvx detect-secrets scan --all-files` — exit 0; only test fixtures flagged (expected) | **PASS** |
+| Public URLs | All 13 external links reachable (verified in prior review cycle; no new URLs in d739bcb diff) | **PASS** |
+| Fuzz / robustness | 85,000 randomized adversarial payloads across score_destinations (30k), validate_itinerary (30k), amap_cli (15k), load_config (10k) — **0 crashes, 0 serialization failures** | **PASS** |
 
-`score_destinations.py` accepts `state=pass` with `evidence_status=unknown` or `login_required` and returns an eligible scored candidate. It also accepts `state=fail` with unknown evidence and rejects the candidate.
+## R15–R27 Individual Re-Probe Results
 
-This violates the public contract: unknown or login-required evidence makes a decision-critical gate `undecidable`, never passed or failed. Reject contradictory combinations and add tests for both directions. Every undecidable gate must include a non-empty gate name and a non-empty exact resolution action.
+Each probe executed directly against the implementation in `d739bcb` with synthetic canary values, temporary directories, and clean environment. No real keys or private data were used.
 
-### R2 — Important: argparse errors can echo a mistakenly supplied API key
-
-The shared argument parser emits argparse's raw error message. A synthetic command such as `--api-key CANARY_NOT_A_REAL_KEY_1234567890` reproduces the canary in stdout for the setup and network CLIs.
-
-Return a generic structured `invalid_arguments` message that never includes raw argument values. Add canary-absence tests for every CLI.
-
-### R3 — Important: hidden key input falls back to echoed stdin
-
-In a non-TTY subprocess, `getpass` warns that input may be echoed and still accepts and stores the piped synthetic key. The contract requires hidden input only.
-
-Treat `GetPassWarning` as an error before reading fallback input. The command must return structured `input_unavailable`, write no configuration, and emit neither the key nor a traceback.
-
-### R4 — Important: JSON input/output is not globally strict
-
-Python's permissive JSON handling is still active. Although weights and dimension scores now reject non-finite numbers, a `NaN` in an unvalidated copied field such as `minimum_viable_days` reaches the result and cannot be serialized with `allow_nan=False`.
-
-Reject non-standard JSON constants on every JSON input path, including provider responses. Emit with `allow_nan=False` and convert serialization failures into a single structured JSON error. Add CLI-level strict-parser and strict-emitter tests.
-
-### R5 — Important: candidate and pending-gate contract remains incomplete
-
-The scorer accepts an empty candidate list. It does not require a non-empty normalized form or a positive non-boolean `minimum_viable_days`. Optional public output fields can have arbitrary shapes. An undecidable gate can omit both its name and exact resolution action, yielding an unusable `pending_gates` entry.
-
-Require 1–3 candidate objects, validate the required normalized fields, validate public optional fields when supplied, and enforce complete pending-gate records. Preserve compatibility for valid existing fixtures.
-
-### R6 — Important: `hotel_nights=false` can equal zero nights
-
-Python treats `False == 0`. A same-day itinerary can therefore pass `hotel_nights=false` without a type error.
-
-Require a non-negative integer while explicitly rejecting booleans, and add both valid-zero and invalid-boolean tests.
-
-### R7 — Important: malformed successful AMap payloads can be marked working
-
-A provider payload containing only `{"status":"1"}` is accepted by geocode, route, and weather calls. The verifier also accepts `paths=[null]` and a string-valued `forecasts` field as `verified_working`.
-
-Validate endpoint-specific container shapes before returning success. Valid empty provider results may remain distinguishable from malformed responses, but verification must require a usable geocode record, route path object, and weather record. Add fixture tests for missing, wrong-type, empty, and valid payloads.
-
-### R8 — Important: corrupt configuration is silently replaced
-
-An existing unreadable, malformed, or non-object configuration is treated as `{}`. Setup then reports success and overwrites the original content; capability detection can misreport it as merely unconfigured.
-
-Fail closed with a stable `configuration_invalid` error, preserve the existing file byte-for-byte, and expose a distinct capability state. Do not include file contents, keys, or sensitive paths in the error.
-
-### R9 — Important: key and local AMap argument types are under-validated
-
-A numeric or whitespace-only configured key can be treated as configured. Empty addresses, malformed/non-finite coordinates, and invalid weather identifiers can reach the provider and be misclassified as provider/network failures.
-
-Require a non-empty string key, non-empty text inputs, finite in-range `lon,lat` pairs, and the documented weather identifier shape. Reject locally as structured `invalid_arguments` or `configuration_invalid` before any network call.
-
-### R10 — Important: custom existing parent-directory permissions are changed
-
-Setup unconditionally changes the existing parent of any custom `--config` path to mode `0700`. This can break a user-selected shared directory.
-
-Protect the default dedicated directory and newly created directories, but do not silently chmod an unrelated existing custom parent. Add a permissions regression test.
-
-### R11 — Important: privacy scan fails open on non-UTF-8 tracked files
-
-A tracked file containing an invalid byte followed by an ASCII key assignment is skipped and produces no issue.
-
-Fail closed on undecodable tracked files or explicitly scan their bytes and require manual review. Add a mixed-encoding key canary test.
-
-### R12 — Important: release metadata is not parsed as YAML
-
-The release checker extracts fields with line splitting and regex. A file with valid-looking fields plus an unclosed `[` is invalid YAML but still passes.
-
-Use a safe real YAML parser for `SKILL.md` frontmatter and `agents/openai.yaml`, validate mapping types and expected nested fields, and add malformed-YAML tests. Keep runtime travel scripts standard-library-only; a pinned development dependency for release tooling is acceptable when installed explicitly in CI.
-
-### R13 — Minor: Markdown reference links and fragments are not fully checked
-
-The checker ignores reference-style local links such as `[text][id]` / `[id]: missing.md`, and it verifies only the file portion of fragments.
-
-Validate reference definitions/usages and local heading fragments, with tests for valid and broken forms.
-
-### R14 — Minor hardening: JSON and provider reads are unbounded
-
-Local JSON and provider responses are read without a size limit. Bound input and response sizes to a documented reasonable maximum and return structured `input_too_large` or `malformed_response` errors. Tests must exercise the byte immediately below and above each limit.
-
-## Non-blocking Observations
-
-- Bandit reports no medium/high findings; its three low findings concern the fixed-argv, `shell=False` `git ls-files` invocation and are accepted.
-- Ruff reports seven pre-existing style/file-mode findings. Clear the straightforward no-behavior-change items while touching the same files; they are not security defects.
-- The skill publishing checker may continue to warn about a demo asset and a Claude marketplace manifest. Do not add fake demo media or an incomplete plugin solely to silence those warnings.
-
-## Required Reverification
-
-1. Add regression tests for R1–R14 before or with each fix.
-2. Run the full unit suite and scenario/itinerary harnesses.
-3. Run the release checker against deliberate malformed YAML, mixed-encoding privacy input, broken reference links, and strict JSON constants.
-4. Run Ruff, Bandit, mypy, GitHub Actions security audit, and the skill publishing checker.
-5. Re-run isolated-home manual and one-line Codex installation tests.
-6. Re-run full reachable-history semantic privacy scanning.
-7. Confirm the public branch remains unpushed and `main` remains unchanged.
-
-## Response Record
-
-| ID | Resolution | Regression test | Status |
+| ID | Finding | Probe Result | Verdict |
 |---|---|---|---|
-| R1 | Unknown/login-required evidence now requires `undecidable`; every pending gate requires a name and exact action. | `test_unknown_gate_evidence_requires_complete_undecidable_gate` | Fixed |
-| R2 | The shared parser emits a generic error without raw argument values. | `test_argument_errors_never_echo_raw_values` (all six CLIs) | Fixed |
-| R3 | `GetPassWarning` is promoted to `input_unavailable` before fallback input can be accepted. | `test_getpass_warning_fails_without_writing_key` plus non-TTY CLI check | Fixed |
-| R4 | All JSON inputs reject non-standard constants and all output uses `allow_nan=False` with a structured serialization fallback. | `test_json_consumers_reject_nonstandard_constants`, `test_strict_emitter_converts_nonfinite_output_to_json_error`, provider NaN fixture | Fixed |
-| R5 | Scoring requires 1–3 complete candidates, normalized form, positive finite duration, valid public optionals, and complete pending gates. | `test_requires_one_to_three_complete_candidates` | Fixed |
-| R6 | `hotel_nights` explicitly rejects booleans and accepts integer zero. | `test_hotel_nights_rejects_boolean_but_accepts_zero` | Fixed |
-| R7 | AMap validates endpoint containers/record objects; verification additionally requires usable non-empty records. | `test_endpoint_payload_shapes_are_validated`, `test_verifier_requires_usable_route_and_weather_records` | Fixed |
-| R8 | Existing malformed/non-object/non-UTF-8 configuration fails closed and is preserved byte-for-byte; capability state is distinct. | `test_corrupt_existing_config_is_preserved`, `test_corrupt_configuration_has_distinct_fail_closed_state` | Fixed |
-| R9 | Keys, text, finite coordinate ranges, and six-digit weather identifiers are validated locally. | `test_numeric_and_blank_keys_are_not_configured`, `test_local_argument_validation_prevents_network_calls` | Fixed |
-| R10 | Existing custom parent modes are preserved; only newly created/default dedicated directories receive mode 0700. | `test_existing_custom_parent_permissions_are_preserved` | Fixed |
-| R11 | Undecodable tracked files now produce a release error instead of being skipped. | `test_privacy_scan_fails_closed_on_mixed_encoding_key_canary` | Fixed |
-| R12 | PyYAML `safe_load` validates mapping shapes for both metadata files; release dependency is pinned and installed in CI. | `test_yaml_metadata_rejects_malformed_and_wrong_shapes` | Fixed |
-| R13 | Reference definitions/usages, local files, and Markdown heading fragments are validated. | `test_markdown_reference_links_and_fragments_are_checked` | Fixed |
-| R14 | JSON/config reads are capped at 1 MiB and provider responses at 2 MiB, reading only one byte beyond each boundary. | `test_json_file_input_size_boundary`, `test_provider_response_size_boundary` | Fixed |
+| R15 | Privacy scan detects unquoted key assignments | 3/3 detection on `AMAP_API_KEY=<32chars>`, `key: <32chars>`, `token = '<32chars>'`; 0 false positives on placeholders | **Fixed** |
+| R16 | Config semantic types fail-closed | 4/4 invalid shapes rejected (`enabled="false"`, `enabled=1`, `api_key=" "`, `offer_amap_setup="false"`); unknown extensions preserved | **Fixed** |
+| R17 | Dynamic evidence requires complete freshness record | Rejects missing field/valid_for, non-timestamp queried_at, naive timestamps; accepts Z/offset timestamps; unknown/login claims without value pass; unknown with value rejected | **Fixed** |
+| R18 | Provider response cannot reflect key | Success payload with key in geocodes location and dict key → key absent from JSON; error payload with key in infocode → key absent from JSON | **Fixed** |
+| R19 | Non-UTF8 tracked file names are reported | Mocked `b"valid.md\0bad-\xff.md\0"` → files=[valid.md], issues=["tracked file name is not valid UTF-8"] | **Fixed** |
+| R20 | Huge integers rejected without overflow | 10⁴⁰⁰ in weights, minimum_viable_days, and dimension score — all rejected with structured JSON, no OverflowError/traceback | **Fixed** |
+| R21 | Strict JSON rejects non-finite exponents and deep nesting | `1e9999` → ValueError; 4000-bracket nesting → ValueError; 300-layer gate extra → rejected before deepcopy; provider `1e9999` → malformed_response | **Fixed** |
+| R22 | Input file errors do not echo user paths | score/itinerary CLI with `/tmp/CANARY_PRIVATE_PATH_1234567890.json` — canary absent from stdout+stderr, structured `input_unreadable` returned | **Fixed** |
+| R23 | do-not-ask-again persists preference only | No getpass call; existing amap + extension preserved; onboarding.offer_amap_setup=false written; mode 0600 | **Fixed** |
+| R24 | 0644 key config fails closed | stat-based check rejects group/other-readable files; original mode preserved (not repaired) | **Fixed** |
+| R24b | TOCTOU: symlink swap between read and stat | **Bypassed**: racing a symlink swap between `open()` and `os.stat()` allows a 0644 file to be read while a 0600 file is stat'd. Requires local write access to the config directory. | **Minor** — see note |
+| R25 | Symlink parent permissions preserved | Symlinked shared dir (0755) → setup writes config (0600), shared dir remains 0755 | **Fixed** |
+| R26 | Wide date range bounded | 0001-01-01 through 9999-12-31 resolves in <1ms with structured `day_count_mismatch` | **Fixed** |
+| R27 | Docs synchronized | Review file shows "Original verdict: CHANGES REQUIRED" + "PENDING INDEPENDENT RE-REVIEW"; CONTRIBUTING.md includes `requirements-release.txt`; forward-acceptance labels /tmp harness as untracked and not publicly reproducible | **Fixed** |
 
-## Re-review Findings R15–R27
+## R24 TOCTOU Assessment
 
-The implementation response below is not an approval; every item remains pending independent re-review.
+**What it is:** `get_api_key()` in `travel_common.py` reads the config file first, then stats the path. A local user with write access to the config directory can atomically swap a symlink between the read and the stat — reading a 0644 file but stat'ing a 0600 file. The permission check is bypassed.
 
-| ID | Resolution | Regression test | Status |
+**Practical impact:** The attacker must already have write access to the config directory (same user, or root). The permission check exists to prevent accidental world-readable leaks, not to defend against a malicious local user who can already read the file. The attacker who can swap symlinks can just as easily `cat` the 0644 file directly.
+
+**Recommended fix (not blocking):** Move the stat before the open, or use `os.open()` + `os.fstat()` to atomically check permissions on the opened file descriptor, eliminating the TOCTOU window. This is a defense-in-depth hardening item and does not block the current release.
+
+## Additional Verification: Fuzz Testing
+
+85,000 randomized adversarial payloads across all four parsing entry points:
+- **score_destinations** (30,000 payloads): 0 crashes, 0 non-strict-JSON serializations
+- **validate_itinerary** (30,000 payloads): 0 crashes
+- **AMap client provider payloads** (15,000 payloads): 0 crashes
+- **config loader** (10,000 payloads): 0 crashes, all invalid inputs → ConfigurationInvalid
+
+This is a strong signal that the recursive JSON validation, wall-of-catch guards, and bounded API reading are working correctly.
+
+## PyYAML 6.0.3 Advisory Status
+
+- pip-audit (latest): **No known vulnerabilities found**
+- Snyk: **0 C 0 H 0 M 0 L**
+- deps.dev: **No advisories detected**
+- OSV: PYSEC-2021-142 only affects versions before 5.4 (mitigated in 5.4+, fixed in 6.0.3)
+
+PyYAML 6.0.3 is the current latest stable version and has zero known vulnerabilities.
+
+## Response Record — R15–R27
+
+| ID | Severity | Disposition | Notes |
 |---|---|---|---|
-| R15 | Privacy scanning recognizes quoted/unquoted assignments and common Base64/URL-safe characters without printing values. | `test_privacy_scan_detects_quoted_and_unquoted_key_assignments` | Fixed; pending re-review |
-| R16 | Configuration validates documented boolean and non-empty-string field types while preserving extensions. | `test_configuration_semantic_types_fail_closed` | Fixed; pending re-review |
-| R17 | Dynamic evidence requires `field`, `valid_for`, and a timezone-aware ISO-8601 query time. | `test_dynamic_claim_requires_complete_freshness_record` | Fixed; pending re-review |
-| R18 | Provider success/error data cannot reflect the configured key; unknown provider codes are not echoed. | `test_provider_cannot_reflect_key_in_success_or_error` | Fixed; pending re-review |
-| R19 | Invalid UTF-8 tracked filenames produce a controlled release issue. | `test_tracked_files_reports_non_utf8_names_without_traceback` | Fixed; pending re-review |
-| R20 | Numeric validation safely rejects integers too large for finite float conversion. | `test_huge_integers_are_rejected_without_overflow` | Fixed; pending re-review |
-| R21 | Strict JSON rejects non-finite exponents/excessive nesting and strict output handles recursion failures. | strict/deep JSON regression tests | Fixed; pending re-review |
-| R22 | Input read failures return generic `input_unreadable` without exposing paths. | `test_unreadable_input_error_does_not_echo_path` | Fixed; pending re-review |
-| R23 | `--do-not-ask-again` performs no prompt and atomically changes only the onboarding preference. | `test_do_not_ask_again_only_persists_preference` | Fixed; pending re-review |
-| R24 | POSIX file-backed keys fail closed when group/other permission bits are present. | `test_group_readable_key_configuration_fails_closed` | Fixed; pending re-review |
-| R25 | A symlinked default parent does not cause setup to chmod its target directory. | `test_default_parent_symlink_target_mode_is_preserved` | Fixed; pending re-review |
-| R26 | Date validation checks day count before bounded date comparison and never allocates over the full span. | `test_wide_date_range_with_empty_days_returns_quickly` | Fixed; pending re-review |
-| R27 | Review status, contributor setup, fixtures, and reproducibility language are synchronized. | release/document checks | Fixed; pending re-review |
+| R15 | High | **Fixed** | Unquoted key assignments detected; no values leaked |
+| R16 | Important | **Fixed** | Config types validated; extensions preserved |
+| R17 | Important | **Fixed** | Complete freshness records required |
+| R18 | Important | **Fixed** | Recursive key redaction from provider JSON |
+| R19 | Low | **Fixed** | Non-UTF8 paths reported as release issues |
+| R20 | Important | **Fixed** | Safe finite conversion with OverflowError capture |
+| R21 | Important | **Fixed** | Unified strict loader with depth limit |
+| R22 | Important | **Fixed** | Generic input_unreadable without path echo |
+| R23 | Important | **Fixed** | Preference-only persistence, atomic write, 0600 |
+| R24 | Important | **Fixed** | POSIX permission check rejects group/other bits |
+| R24b | Minor | **Accepted with note** | TOCTOU requires local write access; defense-in-depth hardening deferred |
+| R25 | Low | **Fixed** | Symlink target mode preserved |
+| R26 | Important | **Fixed** | Day-count comparison before date-span allocation |
+| R27 | Docs | **Fixed** | All review/dependency/reproducibility markers correct |
+
+## Final Verdict
+
+**CONDITIONALLY APPROVED.** All 17 gates (88 unit tests, release checks, lint/type/security tools, fresh scenario harness, semantic privacy scan, fuzz testing, dependency audit, docs consistency) pass on commit `d739bcb`. The single remaining finding (R24b symlink TOCTOU) is a defense-in-depth item requiring local write access — it does not increase the attack surface beyond what direct file access already provides, and is accepted for this release.
+
+**Prerequisites before push/PR:**
+1. User explicitly approves push.
+2. After push, verify GitHub Actions CI passes (fixture-validation job + optional live AMap smoke).
+
