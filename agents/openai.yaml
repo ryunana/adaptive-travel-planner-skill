@@ -1,0 +1,5 @@
+# Codex discovery metadata only; SKILL.md and references are the cross-agent contract.
+interface:
+  display_name: "Adaptive Travel Planner"
+  short_description: "Compare and plan mainland China destinations with live evidence."
+  default_prompt: "Use $adaptive-travel-planner to compare my mainland China destination candidates, resolve decision-critical unknowns, rank the viable options, and plan the best trip."

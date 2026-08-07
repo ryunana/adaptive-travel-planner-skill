@@ -1,6 +1,21 @@
 # Private Traveler Profile
 
 > Copy this file to `references/traveler-profile.md` and fill only what is useful. Keep the completed file local.
+> V2 destination-decision fields are optional. Treat every missing field as `unknown` and ask for it only when it blocks the current decision; existing V1 profiles remain valid.
+
+## Destination Decision Preferences (Optional)
+
+- Preferred candidate granularity: [city / compact region / bounded route / unknown]
+- Typical trip-duration range: [optional]
+- Minimum meaningful stay rule: [optional]
+- Candidate-generation interests or exclusions: [optional]
+- Seasonal destination priorities: [optional]
+- Hard destination vetoes: [safety, health, accessibility, mandatory booking, etc.]
+- Same-day or pre-departure destination-switch tolerance: [optional]
+- Acceptable cancellation or switching cost: [optional]
+- Destination-potential versus current-trip priority: [optional]
+- Preferred evidence-confidence threshold for commitment: [optional]
+- AMap setup preference: [offer / zero-configuration / do not ask again / unknown]
 
 ## Party and Luggage
 
@@ -71,7 +86,7 @@
 ## Booking and Crowds
 
 - Advance booking tolerance: [days]
-- Ticket抢购 tolerance: [conditions]
+- Ticket rush tolerance: [conditions]
 - Crowd tolerance: [low / medium / high]
 - Willingness to pay for reliable efficiency products: [rule]
 - Same-day city-change tolerance: [rule]
@@ -96,6 +111,6 @@ Use both high and low scores. Separate destination potential from actual visit c
 
 - Number of options: [2-3 recommended]
 - Require one clear recommendation: [yes/no]
-- Require explicit cancel/defer verdict: [yes/no]
+- Require explicit dedicated/en-route/conditional/defer verdict: [yes/no]
 - Required details: [weather, tickets, transport, load, fallback, etc.]
 - Preferred answer length: [short / medium / detailed]

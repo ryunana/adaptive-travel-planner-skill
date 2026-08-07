@@ -1,5 +1,19 @@
 # Planning and Output Contract
 
+## Destination-Selection Contract
+
+When the destination is undecided, follow `destination-selection.md` before the itinerary contract below:
+
+1. Show each original candidate label, accepted normalized trip-shaped form, and `minimum_viable_days`.
+2. Evaluate each hard gate as `pass`, `fail`, or `undecidable` before scoring. `unknown` and `login_required` evidence make a gate undecidable, not passed or failed.
+3. Screen every candidate, then spend deep-research effort only on the leading two.
+4. Return `destination_potential`, `this_trip_suitability`, `better_window` when deferred, `suitability_score` when evidence supports it, and separate `evidence_confidence`.
+5. Never present a provisional candidate as an unconditional winner.
+
+The destination decision must include a one-sentence ranking, evidence comparison for every candidate, explicit verdicts, reasons rejected famous options should not be chosen now, a full rank-1 itinerary, a concise rank-2 route with a switch condition, better windows for deferred choices, a 72-hour recheck list, and a fixed `pending_gates` field.
+
+Each `pending_gates` entry must identify the hard gate, affected candidate, evidence status, and exact user action needed. If a rank-2 switch condition fires, rerun changed-item checks and reverify transport inventory, hotel availability or price, weather, closures, and reservation rules whenever the evidence is older than 24 hours.
+
 ## Required Comparison
 
 Start with 2-3 materially different options:
@@ -60,6 +74,9 @@ Do not hide an additional core activity under "optional evening activity."
 - Recent social evidence may identify queues, parking, misleading packaging, and current friction.
 - Recheck when the user's current app screenshot conflicts with search results.
 - Label failed checks unknown. Never interpolate schedules, inventory, opening status, or prices.
+- Record dynamic claims with field, value, evidence status, source, source URL when available, query time, validity scope, and notes as defined in `source-policy-cn.md`.
+- Use only `verified`, `auxiliary`, `unknown`, or `login_required` evidence statuses.
+- Match weather claims to the forecast horizon: climate and seasonal hazards beyond 14 days, low-confidence trends at 8-14 days, daily forecasts at 3-7 days, hourly and attraction-specific checks within 72 hours, and observations/nowcast/closures on the same day.
 
 ## Load Warnings
 
@@ -105,6 +122,9 @@ Show:
 ## Final Audit Checklist
 
 - [ ] Current date, location, completed items, and active bookings are correct.
+- [ ] Candidate forms and `minimum_viable_days` are comparable and accepted.
+- [ ] Every hard gate is pass, fail, or undecidable; unresolved gates appear in `pending_gates`.
+- [ ] Suitability and evidence confidence are separate; destination potential is not confused with exact-date fit.
 - [ ] Calendar dates and hotel nights match.
 - [ ] No unnecessary geographic backtracking.
 - [ ] Every claimed transport service exists on the exact date.
@@ -115,4 +135,5 @@ Show:
 - [ ] Hotel prices are date-specific and actually available.
 - [ ] Rejected famous options include a reason.
 - [ ] Unknown facts are labeled rather than invented.
+- [ ] Rank-2 dynamic evidence will be reverified when switching, including every affected fact older than 24 hours.
 - [ ] The answer does not expose unnecessary private data.

@@ -1,10 +1,38 @@
 # Adaptive Travel Planner Skill
 
-一个面向自由行同好的自适应旅行规划 Skill。
+[![skills.sh](https://skills.sh/b/ryunana/adaptive-travel-planner-skill)](https://skills.sh/ryunana/adaptive-travel-planner-skill)
 
-它不负责把热门景点塞满每一天，而是要求 AI 先确认**你现在在哪里、天气是否适合、景区是否开放、交通是否真实存在、当天是否已经过载**，再比较继续、替换、换城市或下次再来的真实方案。
+> Evidence-based, fatigue-aware travel planning for Agent tools. Private traveler profiles stay local; dynamic facts must be verified or marked unknown.
 
-> English summary: A reusable Agent Skill for weather-aware, evidence-based and fatigue-aware travel planning. It separates a private traveler profile from the public planning method.
+**先选对目的地，再排对行程。**
+
+给它几个候选地、可用天数和你的旅行边界。它不会立刻生成几份很快过期的详细攻略，而是先做三件事：
+
+1. 把大小不一的候选地整理成同一时长内可执行的路线；
+2. 核验天气、开放状态、真实交通和其他会变化的信息，查不到就明确标记；
+3. 先淘汰本次不适合的选项，只为第一名做完整日程，并保留一个可切换的第二名。
+
+结果会给出去向，也会说明为什么、什么条件下不能去、什么时候需要重新查询，以及走累了该怎么停。
+
+## 快速开始
+
+下面使用 Vercel Labs 的 [`skills`](https://github.com/vercel-labs/skills) 安装器，需要 Node.js `>=22.20.0`。Codex 的 Skill 格式和官方用户目录说明见 [Build Skills 文档](https://developers.openai.com/codex/build-skills)。
+
+```bash
+npx skills add ryunana/adaptive-travel-planner-skill -g -a codex -y
+```
+
+安装后可以直接这样问：
+
+```text
+我有 8 天时间，夏天从上海出发，正在考虑北疆、甘南和滇西北。
+先把它们整理成 8 天内可比较的路线，核验天气、交通和人流风险，淘汰不适合本次旅行的选项；
+只为第一名做完整日程，第二名给简要切换路线。查不到的动态信息请标为 unknown 或 login_required，不要估算。
+```
+
+它会先归一化候选路线、检查硬门槛和证据状态，再给出排序。不会为了显得完整而编造票价、余票、天气或开放状态。
+
+想让规划长期贴合你的作息、体力和偏好，可以继续阅读下方的私人画像设置；不使用 Agent Skill 的平台也有可复制的便携提示词。
 
 ## 为什么做这个 Skill
 
@@ -83,13 +111,22 @@ cp templates/traveler-profile.template.md references/traveler-profile.md
 
 ### 3. 安装到支持 Agent Skill 的工具
 
-以 Codex 为例，可以复制或建立软链接：
+Codex 的[官方 Build Skills 文档](https://developers.openai.com/codex/build-skills)使用 `$HOME/.agents/skills` 作为用户级 Skill 目录。要自动安装到该目录并关联 Codex，可以使用 Vercel Labs 的 `skills` 安装器（需要 Node.js `>=22.20.0`）：
 
 ```bash
-ln -s "$(pwd)" ~/.codex/skills/adaptive-travel-planner
+npx skills add ryunana/adaptive-travel-planner-skill -g -a codex -y
 ```
 
-不同 Agent 工具的 Skill 目录和格式可能不同，请以对应工具的文档为准。核心内容都在 `SKILL.md` 和 `references/` 中，可以按需要迁移。
+也可以把当前仓库手工链接到官方用户级 Skill 目录：
+
+```bash
+mkdir -p ~/.agents/skills
+ln -s "$(pwd)" ~/.agents/skills/adaptive-travel-planner
+```
+
+Hermes Agent 可将仓库放到或链接到 `$HERMES_HOME/skills/`，未自定义时通常是 `~/.hermes/skills/`。Claude Code 可按其当前文档放到 `~/.claude/skills/`。
+
+不同 Agent 工具的 Skill 目录和格式可能变化，请以对应工具的当前官方文档为准。核心内容位于 `SKILL.md` 和 `references/`，可以按需要迁移。`agents/openai.yaml` 只用于 Codex 元数据发现，不代表这个 Skill 只能在 Codex 中使用。
 
 ### 4. 在普通聊天 AI 中使用
 
@@ -102,6 +139,8 @@ ln -s "$(pwd)" ~/.codex/skills/adaptive-travel-planner
 ## 怎么提问
 
 适合的请求：
+
+目的地还很模糊时，可以直接使用首屏示例：不必先选定城市，也不必让 AI 同时生成几份很快过期的详细行程。下面是其他常见场景。
 
 ```text
 我明天下午从当前酒店出发。比较继续留在这里、去附近室内项目、直接换城市三个方案。
@@ -125,14 +164,63 @@ ln -s "$(pwd)" ~/.codex/skills/adaptive-travel-planner
 
 这种请求缺少日期、当前状态和个人画像，AI很容易退回大众模板。
 
+## 零配置模式与高德增强模式
+
+默认的**零配置模式**不需要 API Key：Skill 使用当前 Agent 已有的搜索或浏览能力，按官方渠道优先的证据规则比较候选地。它适合先筛选目的地，也能在高德不可用时继续工作；登录后才能看到的 12306、酒店或票务库存会明确标为 `login_required`，不会被猜测。
+
+可选的**高德增强模式**通过仓库内的官方 Web Service API 适配器，改善以下信息：
+
+- 地址解析与坐标确认；
+- 驾车路线、距离、预计时长和通行费参考；
+- 城市级短期基础天气，作为气象与政府来源之外的辅助证据。
+
+它**不会**提供或改善铁路余票、航班与酒店实时价格、景区票量、景区微气候和现场人流，也不能代替相关第一方渠道。尤其在出发前 **8至14天** 的天气决策窗口，高德增强模式没有承诺的预报覆盖增量；仍应使用正常预报来源观察趋势，并保持切换目的地的余地。
+
+### 安全设置高德 Key
+
+高德增强模式完全可选，不配置也不影响零配置模式。高德开放平台注册可能需要绑定手机号并完成实名认证；如果不方便注册，可以跳过本节。
+
+愿意启用增强模式时，先在[高德开放平台](https://lbs.amap.com/api/webservice/guide/create-project/get-key)完成开发者认证，创建 **Web 服务** Key，再运行：
+
+```bash
+python3 scripts/setup_amap.py
+python3 scripts/verify_amap.py
+```
+
+若选择继续使用零配置模式且以后不再提示，只持久化该偏好（不会询问或修改 Key）：
+
+```bash
+python3 scripts/setup_amap.py --do-not-ask-again
+```
+
+设置脚本使用隐藏输入，不接受命令行参数中的 Key；配置保存在 `~/.config/adaptive-travel-planner/config.json`，并以仅当前用户可读写的权限原子写入。不要把 Key 粘贴到聊天、Issue、日志或仓库文件中。CI 等高级场景可以临时使用 `AMAP_API_KEY` 环境变量覆盖本地配置。安装文件存在不代表能力可用，只有地址解析、路线和基础天气三步真实验证通过后，才应标记为 `verified_working`。
+
 ## 标准输出应该包含什么
 
 Skill 要求 AI 首先比较 2至3个**实质不同**的方案：
 
-| 方案 | 预期体验 | 天气适配 | 门到门成本 | 复合负荷 | 机动性 | 最大风险 | 结论 |
+| 方案 | 预期体验 | 天气适配 | 门到门成本 | 复合负荷 | 切换弹性 | 最大风险 | 结论 |
 |---|---|---|---|---|---|---|---|
 
+“切换弹性”指行程中途调整的难易程度，例如能否跳过部分安排、改签或换线成本，以及附近是否有可用备选。
+
 比较后必须给出排序和明确首选。
+
+目的地未定时，比较结果会先展示原始候选、归一化后的本次路线与最少可行天数，再给出证据状态、硬门槛和评分。
+
+> 以下内容仅用于展示输出结构。所有地名、天数和证据状态均为虚构示例，不代表这些目的地的当前事实，也不能据此做旅行决策。
+
+| 排名 | 原始候选 → 本次比较形态 | 最少可行天数 | 动态证据 | 硬门槛 | 本次结论 |
+|---:|---|---:|---|---|---|
+| 1 | 滇西北 → 丽江—香格里拉 8 日 | 7 | 天气已核验；交通待用户确认余票 | `undecidable` | 条件成立时首选 |
+| 2 | 甘南 → 兰州进出小环线 8 日 | 8 | 路线与天气已核验 | `pass` | 可切换备选 |
+| — | 北疆大环线 → 无法压缩为 8 日 | 12 | 不进入评分 | `fail` | 延期，说明更合适窗口 |
+
+状态码说明：`pass` 表示通过硬门槛，`fail` 表示不通过，`undecidable` 表示当前证据不足以判断，`pending_gates` 表示仍有待确认的硬门槛，`login_required` 表示需要登录后获取，`unknown` 表示未查到，`verified_working` 表示能力已经实际验证可用。
+
+最终输出包含一句话排序结论、每个候选的证据比较、第一名完整日程、第二名简要路线与切换条件、延期理由、72 小时复核清单，以及所有未决硬门槛的 `pending_gates`。第二名不是可直接执行的旧备份；触发切换时需要重新核验超过 24 小时的动态信息。
+
+以下字段是检索和核验目标，不是每次都能完整获取的保证。零配置模式与高德增强模式都无法覆盖所有实时信息；逐小时天气、景区内部顺序、实时停车等信息缺少可靠来源时必须标为 `unknown`。完整边界见 [references/capability-matrix.md](references/capability-matrix.md)。
 
 每个核心项目还应包含：
 
@@ -185,6 +273,24 @@ Skill 要求 AI 首先比较 2至3个**实质不同**的方案：
 
 例如，同一个山景目的地可以同时拥有“晴天潜力9分”和“本次大雾实际5分”。把两者分开，AI才不会因为一次坏天气永久排除目的地，也不会忽略再次踩坑的条件。
 
+## 常见问题
+
+### 运行安装命令时提示找不到 `npx`
+
+Vercel Labs 的 `skills` 安装器需要 Node.js `>=22.20.0`。安装或升级 Node.js 后重新打开终端，再运行首屏命令；也可以跳过 `npx`，按上文把仓库手工链接到对应的 Skill 目录。
+
+### 安装后 Agent 没有发现这个 Skill
+
+确认 Skill 目录中存在 `adaptive-travel-planner/SKILL.md`，然后新建或重启 Agent 会话。不同工具的扫描目录可能变化，请以该工具当前文档为准。
+
+### 高德验证失败怎么办
+
+先运行 `python3 scripts/verify_amap.py` 查看哪一步失败。不要把 Key 粘贴到聊天、日志或 Issue；可以直接继续使用零配置模式，目的地筛选不会因此中断。
+
+### 查不到票价、余票、开放状态或逐小时天气怎么办
+
+保留 `unknown` 或 `login_required`，并把它列入出发前复核清单。不要用估算值或过期截图补齐表格。
+
 ## 项目结构
 
 ```text
@@ -194,11 +300,22 @@ Skill 要求 AI 首先比较 2至3个**实质不同**的方案：
 ├── PRIVACY.md                            # 隐私与脱敏建议
 ├── CONTRIBUTING.md                       # 同好贡献说明
 ├── LICENSE
+├── agents/
+│   └── openai.yaml                        # Codex 发现元数据
+├── docs/specs/
+│   └── 2026-08-07-china-destination-selection-v2-design.md
 ├── references/
-│   └── planning-contract.md              # 输出、核验与审计契约
+│   ├── capability-matrix.md               # 零配置与高德能力边界
+│   ├── destination-selection.md           # 候选地筛选流程
+│   ├── planning-contract.md               # 输出、核验与审计契约
+│   ├── scoring-model.md                   # 硬门槛、评分与置信度
+│   └── source-policy-cn.md                # 中国大陆动态信息来源策略
+├── scripts/                               # 检测、设置、评分与校验脚本
 ├── templates/
-│   ├── traveler-profile.template.md      # 私人画像空白模板
-│   └── portable-prompt.template.md       # 普通聊天 AI 提示词
+│   ├── portable-prompt.template.md        # 普通聊天 AI 提示词
+│   ├── traveler-profile.template.md       # 私人画像空白模板
+│   └── trip-brief.template.md             # 目的地决策简报模板
+├── tests/                                 # 无真实 Key 的 fixture 测试
 └── examples/
     └── fictional-traveler-profile.md     # 完全虚构的填写示例
 ```
