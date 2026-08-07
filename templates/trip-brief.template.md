@@ -40,9 +40,11 @@
 - Companion constraints: [optional]
 - Weather, crowd, reservation, or accessibility vetoes: [optional]
 
-## Capability Preference
+## Capability Status and Preference
 
-- Continue in zero-configuration mode if enhanced AMap is unavailable: [yes / no / unknown]
+- Working host web-search or interactive-browser capability verified by a successful current query: [yes / no / unknown]
+- Accept limited mode if neither live discovery capability works: [yes / no / unknown]
+- Continue without AMap in the current mode (host search if live discovery is verified; otherwise limited): [yes / no / unknown]
 - Offer AMap setup: [yes / no / unknown]
 - Do not ask about AMap setup again: [yes / no / unknown]
 

@@ -47,7 +47,9 @@ Verify exact-date hourly weather, warnings, opening status, ticket and refund ru
 
 Prefer official and first-party sources for safety, closure, tickets, and schedules. Use recent social evidence only for queues, parking, misleading packaging, and current on-site friction.
 
-If a query fails, label the fact unknown. Never estimate a schedule, fare, opening status, ticket inventory, or room price.
+For a decision-critical dynamic fact, one failed query is not enough for `unknown`. A clear current authoritative result may stop early. Otherwise, before `unknown`, make at least three substantive attempts, use two materially different query formulations, try official/first-party and domain-appropriate alternative sources, and switch to another available provider or interactive browser after a channel failure. Use `login_required` when the remaining check is behind a confirmed authentication boundary.
+
+Record an attempt log and an explicit stopping reason. Stop after the minimum coverage plus two consecutive no-new-lead attempts, or after six substantive attempts. A new high-value lead found at that boundary may justify one final additional path; if that path does not verify the fact, stop. One blocked page is not an early stop while another safe provider or browser path remains. Follow `references/research-effort-contract.md` when it is available. Never estimate a schedule, fare, opening status, ticket inventory, or room price.
 
 ## Mandatory Method
 

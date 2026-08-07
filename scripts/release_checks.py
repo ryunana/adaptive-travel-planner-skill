@@ -16,6 +16,7 @@ REQUIRED_RESOURCES = (
     "agents/openai.yaml",
     "references/destination-selection.md",
     "references/source-policy-cn.md",
+    "references/research-effort-contract.md",
     "references/capability-matrix.md",
     "references/scoring-model.md",
     "references/planning-contract.md",
@@ -40,6 +41,59 @@ MARKDOWN_LINK = re.compile(r"\[[^]]*\]\(([^)]+)\)")
 REFERENCE_USAGE = re.compile(r"(?<!!)\[[^]]+\]\[([^]]+)\]")
 REFERENCE_DEFINITION = re.compile(r"^\s*\[([^]]+)\]:\s*(\S+)", re.MULTILINE)
 HEADING = re.compile(r"^#{1,6}\s+(.+?)\s*#*\s*$", re.MULTILINE)
+RESEARCH_EFFORT_RESOURCE = "references/research-effort-contract.md"
+RESEARCH_CONTRACT_REFERENCES = (
+    "SKILL.md",
+    "README.md",
+    "references/source-policy-cn.md",
+    "references/planning-contract.md",
+    "references/destination-selection.md",
+    "references/capability-matrix.md",
+    "templates/portable-prompt.template.md",
+    "docs/specs/2026-08-07-china-destination-selection-v2-design.md",
+)
+RESEARCH_EFFORT_MARKERS = (
+    ("at least three substantive attempts", "minimum three substantive attempts"),
+    ("two materially different query formulations", "two materially different query formulations"),
+    ("official or first-party source", "official or first-party source"),
+    ("domain-appropriate alternative source", "domain-appropriate alternative source"),
+    ("another available discovery channel", "available discovery channel fallback"),
+    ("interactive browser", "interactive browser fallback"),
+    ("login_required", "login-required branch"),
+    ("attempt_log", "attempt log"),
+    ("two consecutive attempts", "bounded stopping conditions"),
+    ("six substantive attempts", "bounded stopping conditions"),
+    ("new high-value lead", "bounded stopping conditions"),
+    ("one blocked path is not an early stop", "single blocked path fallback"),
+    ("one final additional path", "one final additional path"),
+)
+RESEARCH_SUMMARY_CAP_MARKERS = {
+    "README.md": "最多再跟进一条最终路径",
+    "templates/portable-prompt.template.md": "one final additional path",
+}
+BLOCKED_PATH_EARLY_STOP = re.compile(
+    r"further\s+access\s+would\s+require\s+bypassing\s+(?:a\s+)?captcha",
+    re.IGNORECASE,
+)
+UNBOUNDED_HIGH_VALUE_LEAD = (
+    re.compile(
+        r"six\s+substantive\s+attempts\s+unless\s+a\s+new\s+high-value\s+lead\s+appears",
+        re.IGNORECASE,
+    ),
+    re.compile(r"六次实质尝试且没有新的高价值线索[^。\n]*即可停止"),
+)
+ONE_QUERY_UNKNOWN = (
+    re.compile(
+        r"if\s+(?:a|one)\s+query\s+fails?,\s*label\s+the\s+fact\s+unknown",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"if\s+a\s+query\s+fails,\s*report\s+`?unknown`?\s+instead\s+of\s+estimating",
+        re.IGNORECASE,
+    ),
+    re.compile(r"label\s+failed\s+checks?\s+unknown", re.IGNORECASE),
+    re.compile(r"查询失败(?:时|后)?.{0,24}(?:标为|标记为?)\s*`?unknown`?", re.IGNORECASE),
+)
 
 
 def _yaml_mapping(text: str, label: str):
@@ -121,6 +175,50 @@ def validate_openai_metadata(skill_path: Path, metadata_path: Path) -> list[str]
 
 def validate_required_resources(root: Path) -> list[str]:
     return [f"required resource missing: {relative}" for relative in REQUIRED_RESOURCES if not (root / relative).is_file()]
+
+
+def validate_research_effort_contract(root: Path) -> list[str]:
+    """Keep active Agent instructions from collapsing one failed query into unknown."""
+    issues = []
+    contract_path = root / RESEARCH_EFFORT_RESOURCE
+    if not contract_path.is_file():
+        return [f"required research effort resource missing: {RESEARCH_EFFORT_RESOURCE}"]
+    try:
+        contract = contract_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return [f"cannot read research effort resource: {RESEARCH_EFFORT_RESOURCE}"]
+
+    folded_contract = contract.casefold()
+    seen_labels = set()
+    for marker, label in RESEARCH_EFFORT_MARKERS:
+        if marker.casefold() not in folded_contract and label not in seen_labels:
+            issues.append(f"{RESEARCH_EFFORT_RESOURCE} missing requirement: {label}")
+            seen_labels.add(label)
+    if BLOCKED_PATH_EARLY_STOP.search(contract):
+        issues.append(
+            f"{RESEARCH_EFFORT_RESOURCE} permits one blocked path to stop research"
+        )
+
+    for relative in RESEARCH_CONTRACT_REFERENCES:
+        path = root / relative
+        if not path.is_file():
+            issues.append(f"research effort contract reference missing: {relative}")
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            issues.append(f"cannot read research effort contract reference: {relative}")
+            continue
+        if "research-effort-contract.md" not in text:
+            issues.append(f"{relative} must reference {RESEARCH_EFFORT_RESOURCE}")
+        if any(pattern.search(text) for pattern in ONE_QUERY_UNKNOWN):
+            issues.append(f"{relative} permits unknown after one failed query")
+        if any(pattern.search(text) for pattern in UNBOUNDED_HIGH_VALUE_LEAD):
+            issues.append(f"{relative} has an unbounded high-value-lead exception")
+        required_cap = RESEARCH_SUMMARY_CAP_MARKERS.get(relative)
+        if required_cap is not None and required_cap not in text:
+            issues.append(f"{relative} must retain the one-final-path hard cap")
+    return issues
 
 
 def scan_privacy(root: Path, files: list[Path]) -> list[str]:
@@ -232,6 +330,7 @@ def main() -> int:
     issues.extend(validate_skill_metadata(ROOT / "SKILL.md"))
     issues.extend(validate_openai_metadata(ROOT / "SKILL.md", ROOT / "agents/openai.yaml"))
     issues.extend(validate_required_resources(ROOT))
+    issues.extend(validate_research_effort_contract(ROOT))
     issues.extend(validate_markdown_links(ROOT, files))
     issues.extend(scan_privacy(ROOT, files))
     if issues:

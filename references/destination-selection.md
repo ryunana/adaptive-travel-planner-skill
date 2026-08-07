@@ -32,17 +32,20 @@ If the minimum meaningful form still materially exceeds available time, or the u
 
 ## Stage B: Detect Capabilities
 
-Detect and report web search, interactive browser and likely login needs, Python runtime, AMap adapter installation, key configuration, and verified-query status. An installed file is not a working capability.
+Detect and report web search, interactive browser and likely login needs, Python runtime, AMap adapter installation, key configuration, and verified-query status. An installed file is not a working capability. Full dynamic planning requires at least one successful current query through web search or an interactive browser.
+
+If neither live discovery capability works, enter limited mode. Continue only with candidate normalization, stable profile fit, composite-load analysis, structural review, and current evidence supplied by the user. Keep unsupported dynamic facts `unknown` or `login_required`; do not present the result as a fully verified current itinerary. Missing web search and missing AMap are different conditions.
+
+One failed provider test does not establish that live discovery is unavailable. Follow `research-effort-contract.md`: try another available provider or interactive browser before declaring the discovery capability unavailable. AMap may verify only its map-specific fields; an authenticated session may be conditionally required for inventory.
 
 If enhanced AMap mode is unavailable, describe its narrow benefit: geocoding, driving route, distance, duration, toll reference, and short-horizon city-level baseline weather. It does not provide rail or flight inventory, hotel prices, attraction ticket stock, scenic-area microclimate, or crowd conditions, and it does not extend the 8-14 day weather decision horizon.
 
-Offer exactly these choices:
+When optional AMap enhancement is unavailable, offer exactly one mode-appropriate choice set:
 
-1. Install and continue.
-2. Continue in zero-configuration mode.
-3. Continue and do not ask again.
+- If web search or an interactive browser has completed a successful current query: (1) set up AMap and continue in host search mode, (2) continue in host search mode without AMap, or (3) continue without AMap and do not ask again.
+- If neither live discovery capability works: (1) set up AMap as a narrow map enhancement while remaining in limited mode, (2) continue in limited mode without AMap, or (3) continue in limited mode without AMap and do not ask again.
 
-Persist only choice 3. Follow `capability-matrix.md`; never imply that instructions alone create provider access.
+Persist only the third choice in the selected set. AMap success or failure never changes the discovery mode by itself. Follow `capability-matrix.md`; never imply that instructions alone create provider access.
 
 ## Stage C: Optional AMap Setup
 
@@ -50,7 +53,7 @@ Proceed only after explicit consent. Direct the user to the official AMap Open P
 
 Use only the repository's official-API wrapper. Store local configuration under `~/.config/adaptive-travel-planner/config.json`, with user-only directory access where supported, atomic writes, and user read/write file permissions. `AMAP_API_KEY` may override the file. Accept an interactively supplied key through hidden input only; never place it in an argument, output, logs, or errors.
 
-Verify a real geocode, route, and baseline-weather query. Report the exact failed stage and remain in zero-configuration mode if any check fails. Recheck current official endpoint, Web Service key, quota, and terms documentation during adapter implementation rather than relying on remembered contracts.
+Verify a real geocode, route, and baseline-weather query. Report the exact failed stage and preserve the current discovery mode if any check fails: remain in host search mode only when web search or an interactive browser is verified working; otherwise remain in limited mode. Recheck current official endpoint, Web Service key, quota, and terms documentation during adapter implementation rather than relying on remembered contracts.
 
 ## Stage D: Screen All Candidates
 
@@ -91,6 +94,8 @@ For the top two provisional candidates, verify as available:
 - route topology and internal travel burden;
 - composite physical and driving load;
 - cancellation deadlines and switching cost.
+
+Apply the full bounded protocol in `research-effort-contract.md` to every unresolved decision-critical dynamic fact for the top two candidates and the executable rank-1 itinerary. A current authoritative result may stop immediately; otherwise use the required query reformulation, source ladder, available-channel fallback, attempt log, and stopping condition before `unknown`. Use the lighter supporting-fact budget for details that cannot change ranking, a hard gate, or execution.
 
 Represent dynamic facts using the evidence record in `source-policy-cn.md`. Never fabricate a score when decision-critical evidence is insufficient.
 

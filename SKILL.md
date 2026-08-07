@@ -46,11 +46,29 @@ First identify the route:
 
 For destination selection, load detailed references only when their step begins:
 
-- research or evidence classification: `references/source-policy-cn.md`;
+- research effort: `references/research-effort-contract.md`;
+- evidence classification: `references/source-policy-cn.md`;
 - capability detection, AMap explanation, or setup: `references/capability-matrix.md`;
 - hard-gate evaluation, ranking, or confidence: `references/scoring-model.md`.
 
 Do not preload source, adapter, or scoring detail for an itinerary-only request. The destination-selection route must normalize each candidate, apply three-state hard gates before scores, screen every candidate, deep-research only the leaders, and keep unresolved gates explicit.
+
+## Runtime Capability Gate
+
+Full dynamic planning requires at least one working host capability that can search the current web or inspect current first-party pages. Installing this Skill does not install or configure a search backend. Before relying on live evidence, confirm that the host can complete one current query.
+
+For mainland China dynamic facts:
+
+1. Open a known official URL directly when one is available.
+2. If the host exposes a verified Chinese web-search provider, such as Doubao Search Custom or a `doubao-search` skill, prefer it for discovering official notices, domestic transport changes, policies, prices, and recent Chinese sources.
+3. Otherwise use the host's default web search or interactive browser. Doubao is recommended, not mandatory.
+4. Use AMap for geography, POI, and driving evidence; it is not a substitute for general web search.
+
+Search results are discovery evidence, not automatic proof. Open the original source, preserve its published precision, and follow `references/source-policy-cn.md`.
+
+For every decision-critical dynamic fact, follow `references/research-effort-contract.md`. Do not assign `unknown` after one failed query. Before `unknown`, make the required bounded multi-query, multi-source, and available-channel attempts, record the attempt log and stopping reason, and use `login_required` when the remaining check is behind a confirmed authentication boundary. A clear current authoritative result may stop the search early.
+
+If neither web search nor an interactive browser works, enter limited mode: use current evidence supplied by the user, keep unsupported dynamic facts `unknown` or `login_required`, and do not describe the result as a fully verified current itinerary. Never request provider keys in chat or copy host credentials into this repository.
 
 ## Current-State Gate
 
@@ -78,7 +96,7 @@ Keep these layers separate:
 
 Current user evidence overrides stale search results. Official safety, closure, and ticket information overrides social evidence.
 
-State source and query time for facts that can drift. If a query fails, report unknown instead of estimating.
+State source and query time for facts that can drift. A failed query triggers the bounded fallback and retry protocol in `references/research-effort-contract.md`; report `unknown` only after an allowed stopping condition, never by estimating.
 
 ## Workflow
 

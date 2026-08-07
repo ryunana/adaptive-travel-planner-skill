@@ -21,7 +21,7 @@ V2 must support vague candidate-level requests without immediately generating se
 - Candidate destination comparison and elimination.
 - Low-cost generation of two to four candidates when the user has none, using the stable traveler profile and seasonal knowledge before live-query budget is spent.
 - Exact-date transport, weather, attraction, hotel, crowd, and route research when tools permit.
-- Zero-configuration browser/search mode.
+- Host-provided browser/search mode, with at least one successful current query required for full dynamic planning.
 - Optional enhanced AMap mode using an official Web Service API key.
 - Private traveler profile, composite-load rules, explicit go/conditional/defer/cancel decisions, and post-trip calibration.
 - A complete itinerary for the first-ranked option and a concise switchable route for the second-ranked option.
@@ -83,15 +83,16 @@ Detect and report:
 - AMap enhanced adapter installation;
 - AMap key configuration and verified query status.
 
+Full dynamic planning requires a working host web-search or interactive-browser capability. If neither can complete a current query, continue only in limited mode: normalize candidates, apply stable profile preferences, analyze composite load, review itinerary structure, and use current evidence supplied by the user. Unsupported dynamic facts remain `unknown` or `login_required`, and the result must not be described as a fully verified current itinerary.
+
 If AMap enhanced mode is unavailable, explain precisely what improves with it: geocoding, driving routes, distance, duration, toll reference, and short-horizon city-level baseline weather. State that rail inventory, flights, hotels, attraction tickets, microclimate, and crowd conditions still need other sources. Also state that AMap does not extend the 8-14 day weather decision horizon beyond the normal forecast sources, so enhanced mode has no promised weather-coverage gain for that window. Exact forecast horizon and quota statements must come from the official documentation rechecked during implementation.
 
-Offer:
+When optional AMap enhancement is unavailable, offer one mode-appropriate set:
 
-1. Install and continue.
-2. Continue in zero-configuration mode.
-3. Continue and do not ask again.
+- With verified live discovery: (1) set up AMap and continue in host search mode, (2) continue in host search mode without AMap, or (3) continue without AMap and do not ask again.
+- Without verified live discovery: (1) set up AMap as a narrow map enhancement while remaining in limited mode, (2) continue in limited mode without AMap, or (3) continue in limited mode without AMap and do not ask again.
 
-Persist only the third preference locally.
+Persist only the third preference in the selected set. AMap success or failure never changes discovery mode by itself.
 
 ### Stage C: Optional AMap setup
 
@@ -156,6 +157,8 @@ For the top two candidates, verify as available:
 - composite physical and driving load;
 - cancellation deadlines and switching cost.
 
+Decision-critical dynamic facts for these leaders follow `references/research-effort-contract.md`. A current authoritative result may stop immediately. Before `unknown`, unresolved facts require the bounded minimum of materially different queries, official/first-party and domain-appropriate alternative sources, another available provider or interactive browser after channel failure, an attempt log, and an explicit stopping condition. Supporting details that cannot change the decision use the lighter budget defined there.
+
 ### Stage F: Decide and plan
 
 Output:
@@ -203,6 +206,8 @@ Every dynamic fact should map to:
   "source_url": null,
   "queried_at": "ISO-8601 timestamp",
   "valid_for": "exact travel date",
+  "attempt_log": [],
+  "exhaustion_reason": null,
   "notes": "User must confirm in authenticated app"
 }
 ```
@@ -211,7 +216,7 @@ Allowed statuses:
 
 - `verified`: direct official or first-party current evidence;
 - `auxiliary`: credible but not authoritative experience or marketplace evidence;
-- `unknown`: query failed or no reliable source;
+- `unknown`: the bounded protocol reached an allowed stopping condition without reliable evidence;
 - `login_required`: the next check requires the user's authenticated session.
 
 ## 6. Forecast Horizon Rules
@@ -308,7 +313,7 @@ Scripts should use the Python standard library where practical and support a bro
 Update README with:
 
 - the vague-candidates use case;
-- zero-configuration versus enhanced mode;
+- host search and limited modes versus enhanced AMap;
 - what enhanced AMap does and does not improve;
 - safe key setup;
 - destination comparison and output examples.
@@ -317,13 +322,15 @@ Update README with:
 
 | Failure | Required behavior |
 |---|---|
-| No AMap key | Explain impact, offer setup, then use browser mode if declined |
+| No AMap key | Explain impact, offer setup, then preserve the current discovery mode if declined: use host search mode only when live discovery is verified; otherwise remain in limited mode |
+| No working web search or interactive browser | Enter limited mode; keep unsupported dynamic facts unknown or login-required and do not claim a fully verified current itinerary |
 | Invalid or quota-limited key | Mark enhanced capability failed; never expose key |
 | 12306 or hotel login required | Mark field login-required and ask for authenticated check or screenshot |
+| One search provider or query fails | Follow the available provider/browser fallback and query-reformulation rules in `references/research-effort-contract.md`; do not assign unknown after one failure |
 | One provider disagrees with another | Prefer first-party evidence and explain discrepancy |
 | Weather outside reliable horizon | Use climate/seasonal risk and lower confidence |
 | Candidate has insufficient evidence | Do not fabricate score; report uncertainty and missing decision-critical facts |
-| Install succeeds but live test fails | Report setup incomplete and stay in zero-configuration mode |
+| AMap install succeeds but its live test fails | Report setup incomplete and stay in host search mode when live discovery still works; otherwise enter limited mode |
 | Entire city loses primary value | Compare another city, not only weak local substitutes |
 
 ## 10. Validation
@@ -354,8 +361,12 @@ Update README with:
 6. Rank 1 becomes invalid within 72 hours and the plan switches to rank 2.
 7. A famous destination scores high in potential but low for the current trip.
 8. Mixed-granularity candidates (regional circuit versus single city) with limited days; output must show each normalized candidate form and its minimum viable days before ranking.
+9. Official source lookup fails, a reformulated query finds current official evidence, and the fact becomes verified rather than unknown.
+10. Web search fails, an interactive browser opens the current official page, and the fact becomes verified.
+11. Exact inventory is behind a confirmed authentication boundary and becomes login-required with an exact user action.
+12. Official and alternative sources plus available channels are reasonably exhausted and the fact becomes unknown with an attempt summary and stopping reason.
 
-Acceptance requires a ranked destination decision, evidence statuses, one full itinerary, one concise fallback route, explicit deferred reasons, and no fabricated dynamic facts.
+Acceptance requires a ranked destination decision, evidence statuses, one full itinerary, one concise fallback route, explicit deferred reasons, no fabricated dynamic facts, and no decision-critical `unknown` produced after only one failed query.
 
 ## 11. Release Plan
 
