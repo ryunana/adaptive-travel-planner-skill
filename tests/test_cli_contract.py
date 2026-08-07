@@ -1,4 +1,7 @@
+import contextlib
+import io
 import json
+import math
 import os
 import subprocess
 import sys
@@ -59,6 +62,26 @@ class CliContractTests(unittest.TestCase):
                 self.assertFalse(payload["ok"])
                 self.assertEqual(payload["error"]["code"], "invalid_arguments")
 
+    def test_argument_errors_never_echo_raw_values(self):
+        canary = "CANARY_NOT_A_REAL_KEY_1234567890"
+        cases = (
+            ("setup_amap", ("--config", canary, "--bad")),
+            ("amap_cli", ("--api-key", canary)),
+            ("verify_amap", ("--timeout", canary)),
+        )
+        for name, args in cases:
+            with self.subTest(name=name):
+                result = self.run_script(name, *args, input_text="")
+                self.assertEqual(result.returncode, 2)
+                self.assertNotIn(canary, result.stdout + result.stderr)
+                self.assertEqual(json.loads(result.stdout)["error"]["code"], "invalid_arguments")
+
+        for name in NAMES:
+            with self.subTest(name=name, generic=True):
+                result = self.run_script(name, "--" + canary, input_text="")
+                self.assertEqual(result.returncode, 2)
+                self.assertNotIn(canary, result.stdout + result.stderr)
+
     def test_no_argument_results_are_structured_json(self):
         for name in NAMES:
             with self.subTest(name=name):
@@ -96,6 +119,43 @@ class CliContractTests(unittest.TestCase):
                 self.assertEqual(result.stderr, "")
                 payload = json.loads(result.stdout, parse_constant=lambda value: self.fail(value))
                 self.assertFalse(payload["ok"])
+
+    def test_json_consumers_reject_nonstandard_constants(self):
+        for name, value in (
+            ("score_destinations", '{"minimum_viable_days":NaN,"candidates":[]}'),
+            ("validate_itinerary", '{"start_date":"2026-08-07","end_date":"2026-08-07","hotel_nights":NaN,"days":[],"route":[]}'),
+        ):
+            with self.subTest(name=name):
+                result = self.run_script(name, "-", input_text=value)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(result.stderr, "")
+                payload = json.loads(result.stdout, parse_constant=lambda constant: self.fail(constant))
+                self.assertFalse(payload["ok"])
+
+    def test_json_file_input_size_boundary(self):
+        sys.path.insert(0, str(SCRIPTS))
+        import travel_common
+        with tempfile.TemporaryDirectory() as directory:
+            below = Path(directory) / "below.json"
+            above = Path(directory) / "above.json"
+            prefix = b'{"padding":"'
+            suffix = b'"}'
+            below.write_bytes(prefix + (b"a" * (travel_common.MAX_JSON_BYTES - len(prefix) - len(suffix))) + suffix)
+            above.write_bytes(below.read_bytes() + b" ")
+            accepted = self.run_script("validate_itinerary", str(below))
+            rejected = self.run_script("validate_itinerary", str(above))
+        self.assertNotEqual(accepted.returncode, 0)
+        self.assertNotEqual(json.loads(accepted.stdout)["issues"][0]["code"], "input_too_large")
+        self.assertEqual(json.loads(rejected.stdout)["issues"][0]["code"], "input_too_large")
+
+    def test_strict_emitter_converts_nonfinite_output_to_json_error(self):
+        sys.path.insert(0, str(SCRIPTS))
+        import travel_common
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            exit_code = travel_common.emit({"ok": True, "value": math.nan})
+        self.assertNotEqual(exit_code, 0)
+        self.assertEqual(json.loads(output.getvalue())["error"]["code"], "serialization_error")
 
     def test_network_timeouts_must_be_positive_and_finite(self):
         env = os.environ.copy()

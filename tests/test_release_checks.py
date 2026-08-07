@@ -11,6 +11,22 @@ import release_checks
 
 
 class ReleaseChecksTests(unittest.TestCase):
+    def test_yaml_metadata_rejects_malformed_and_wrong_shapes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            skill = root / "SKILL.md"
+            metadata = root / "openai.yaml"
+            skill.write_text("---\nname: example\ndescription: [\n---\n# Example\n", encoding="utf-8")
+            metadata.write_text("interface: [\n", encoding="utf-8")
+            self.assertTrue(release_checks.validate_skill_metadata(skill))
+            self.assertTrue(release_checks.validate_openai_metadata(skill, metadata))
+            skill.write_text("---\nname: [example]\ndescription: [bad]\n---\n# Example\n", encoding="utf-8")
+            metadata.write_text("interface: []\n", encoding="utf-8")
+            self.assertTrue(release_checks.validate_skill_metadata(skill))
+            self.assertTrue(release_checks.validate_openai_metadata(skill, metadata))
+            metadata.write_text('interface:\n  display_name: "Example"\n  short_description: "Bad"\n', encoding="utf-8")
+            self.assertTrue(release_checks.validate_openai_metadata(skill, metadata))
+
     def test_skill_metadata_requires_name_and_description(self):
         with tempfile.TemporaryDirectory() as directory:
             skill = Path(directory) / "SKILL.md"
@@ -73,6 +89,31 @@ class ReleaseChecksTests(unittest.TestCase):
                 encoding="utf-8",
             )
             self.assertEqual(release_checks.scan_privacy(root, [safe]), [])
+
+    def test_privacy_scan_fails_closed_on_mixed_encoding_key_canary(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            unsafe = root / "unsafe.bin"
+            unsafe.write_bytes(b"\xff\napi_key='" + (b"x" * 32) + b"'\n")
+            issues = release_checks.scan_privacy(root, [unsafe])
+            self.assertTrue(any("cannot decode" in issue or "key-like assigned value" in issue for issue in issues))
+
+    def test_markdown_reference_links_and_fragments_are_checked(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "target.md"
+            target.write_text("# Existing Heading\n", encoding="utf-8")
+            source = root / "source.md"
+            source.write_text(
+                "[good][ok]\n[bad][missing]\n[bad heading](target.md#missing-heading)\n\n"
+                "`[code][not-a-reference]`\n```text\n[fenced][not-a-reference]\n```\n"
+                "[ok]: target.md#existing-heading\n[missing]: absent.md\n",
+                encoding="utf-8",
+            )
+            issues = release_checks.validate_markdown_links(root, [source, target])
+            self.assertEqual(len(issues), 2)
+            self.assertTrue(any("absent.md" in issue for issue in issues))
+            self.assertTrue(any("missing-heading" in issue for issue in issues))
 
     def test_openai_metadata_matches_skill_frontmatter(self):
         self.assertEqual(

@@ -3,7 +3,7 @@
 import math
 from copy import deepcopy
 
-from travel_common import JsonArgumentParser, emit, read_json
+from travel_common import JsonArgumentParser, TravelInputError, emit, read_json
 
 DEFAULT_WEIGHTS = {
     "preference_fit": 25,
@@ -97,11 +97,20 @@ def score_payload(payload):
     if any(not math.isfinite(value) or value < 0 for value in weights.values()) or abs(sum(weights.values()) - 100) > 1e-9:
         return {"ok": False, "error": {"code": "invalid_weights", "message": "Weights must be nonnegative and total 100"}}
     raw_candidates = payload.get("candidates", [])
-    if not isinstance(raw_candidates, list) or any(not isinstance(candidate, dict) for candidate in raw_candidates):
-        return {"ok": False, "error": {"code": "invalid_candidates", "message": "candidates must be an array of JSON objects"}}
+    if not isinstance(raw_candidates, list) or not 1 <= len(raw_candidates) <= 3 or any(not isinstance(candidate, dict) for candidate in raw_candidates):
+        return {"ok": False, "error": {"code": "invalid_candidates", "message": "candidates must contain one to three JSON objects"}}
     for candidate in raw_candidates:
         if not isinstance(candidate.get("name"), str) or not candidate["name"].strip():
             return {"ok": False, "error": {"code": "invalid_candidate", "message": "candidate name must be a non-empty string"}}
+        if not isinstance(candidate.get("normalized_form"), str) or not candidate["normalized_form"].strip():
+            return {"ok": False, "error": {"code": "invalid_candidate", "message": "candidate normalized_form must be a non-empty string"}}
+        days = candidate.get("minimum_viable_days")
+        if isinstance(days, bool) or not isinstance(days, (int, float)) or not math.isfinite(days) or days <= 0:
+            return {"ok": False, "error": {"code": "invalid_candidate", "message": "candidate minimum_viable_days must be positive and finite"}}
+        for field in ("destination_potential", "this_trip_suitability", "better_window"):
+            value = candidate.get(field)
+            if value is not None and (not isinstance(value, str) or not value.strip()):
+                return {"ok": False, "error": {"code": "invalid_candidate", "message": f"candidate {field} must be a non-empty string or null"}}
         if not isinstance(candidate.get("dimensions", {}), dict) or not isinstance(candidate.get("hard_gates", []), list):
             return {"ok": False, "error": {"code": "invalid_candidate", "message": "candidate dimensions must be an object and hard_gates must be an array"}}
         gates = candidate.get("hard_gates", [])
@@ -114,6 +123,14 @@ def score_payload(payload):
             status = gate.get("evidence_status")
             if not isinstance(status, str) or status not in EVIDENCE_STATUSES:
                 return {"ok": False, "error": {"code": "invalid_candidate", "message": "hard gate evidence_status is invalid"}}
+            if status in {"unknown", "login_required"} and state != "undecidable":
+                return {"ok": False, "error": {"code": "invalid_candidate", "message": "unknown gate evidence must be undecidable"}}
+            if state == "undecidable":
+                if not isinstance(gate.get("name"), str) or not gate["name"].strip():
+                    return {"ok": False, "error": {"code": "invalid_candidate", "message": "undecidable gate name must be a non-empty string"}}
+                action = gate.get("resolution_action")
+                if not isinstance(action, str) or not action.strip():
+                    return {"ok": False, "error": {"code": "invalid_candidate", "message": "undecidable gate resolution_action must be a non-empty string"}}
         for record in candidate["dimensions"].values():
             if not isinstance(record, dict):
                 return {"ok": False, "error": {"code": "invalid_candidate", "message": "every dimension must be a JSON object"}}
@@ -158,7 +175,8 @@ def main(argv=None):
     try:
         result = score_payload(read_json(args.input))
     except (OSError, ValueError) as exc:
-        result = {"ok": False, "error": {"code": "invalid_input", "message": str(exc)}}
+        code = exc.code if isinstance(exc, TravelInputError) else "invalid_input"
+        result = {"ok": False, "error": {"code": code, "message": str(exc)}}
     return emit(result, 0 if result.get("ok") else 1)
 
 

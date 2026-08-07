@@ -6,6 +6,7 @@ from pathlib import Path
 from amap_cli import AMapClient
 from travel_common import (
     DEFAULT_CONFIG,
+    ConfigurationInvalid,
     JsonArgumentParser,
     emit,
     get_api_key,
@@ -35,12 +36,14 @@ def verify(client):
     except (AttributeError, TypeError, ValueError):
         return _failed("geocode", {"error": {"code": "malformed_response", "message": "Geocode response location must be valid lon,lat"}}, completed)
     completed.append("geocode")
-    destination = "{:.6f},{:.6f}".format(longitude + 0.01, latitude)
+    destination = f"{longitude + 0.01:.6f},{latitude:.6f}"
     route = client.route(origin, destination)
     if not route.get("ok"):
         return _failed("route", route, completed)
     try:
-        route["data"]["route"]["paths"][0]
+        path = route["data"]["route"]["paths"][0]
+        if not isinstance(path, dict):
+            raise TypeError("route path must be an object")
     except (KeyError, IndexError, TypeError):
         return _failed("route", {"error": {"code": "malformed_response", "message": "Route response lacks paths"}}, completed)
     completed.append("route")
@@ -49,7 +52,11 @@ def verify(client):
     if not weather.get("ok"):
         return _failed("weather", weather, completed)
     data = weather.get("data", {})
-    if not data.get("forecasts") and not data.get("lives"):
+    forecasts = data.get("forecasts")
+    lives = data.get("lives")
+    usable_forecasts = isinstance(forecasts, list) and bool(forecasts) and all(isinstance(item, dict) for item in forecasts)
+    usable_lives = isinstance(lives, list) and bool(lives) and all(isinstance(item, dict) for item in lives)
+    if not usable_forecasts and not usable_lives:
         return _failed("weather", {"error": {"code": "malformed_response", "message": "Weather response lacks observations/forecasts"}}, completed)
     completed.append("weather")
     return {"ok": True, "state": "verified_working", "completed_stages": completed}
@@ -60,7 +67,10 @@ def main(argv=None):
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     parser.add_argument("--timeout", type=positive_finite_float, default=10.0)
     args = parser.parse_args(argv)
-    key, source = get_api_key(args.config)
+    try:
+        key, source = get_api_key(args.config)
+    except ConfigurationInvalid:
+        return emit({"ok": False, "state": "configuration_invalid", "failed_stage": "configuration", "error": {"code": "configuration_invalid", "message": "AMap configuration is invalid"}}, 2)
     if not key:
         return emit({"ok": False, "state": "installed_but_unconfigured", "failed_stage": "configuration", "error": {"code": "missing_key", "message": "Configure an AMap Web Service key first"}}, 2)
     result = verify(AMapClient(key, args.timeout))

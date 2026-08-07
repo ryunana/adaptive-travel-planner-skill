@@ -55,5 +55,27 @@ class VerifyTests(unittest.TestCase):
         self.assertEqual(result["completed_stages"], [])
         self.assertEqual(client.calls, ["geocode"])
 
+    def test_verifier_requires_usable_route_and_weather_records(self):
+        import verify_amap
+        class ShapeClient(FakeClient):
+            def __init__(self, route_data, weather_data):
+                super().__init__()
+                self.route_data = route_data
+                self.weather_data = weather_data
+            def route(self, origin, destination):
+                return self._result("route", self.route_data)
+            def weather(self, city):
+                return self._result("weather", self.weather_data)
+        cases = (
+            ({"route": {"paths": [None]}}, {"forecasts": [{"city": "x"}]}),
+            ({"route": {"paths": [{}]}}, {"forecasts": "bad"}),
+            ({"route": {"paths": [{}]}}, {"forecasts": []}),
+        )
+        for route_data, weather_data in cases:
+            with self.subTest(route_data=route_data, weather_data=weather_data):
+                result = verify_amap.verify(ShapeClient(route_data, weather_data))
+                self.assertFalse(result["ok"])
+                self.assertEqual(result["error"]["code"], "malformed_response")
+
 
 if __name__ == "__main__": unittest.main()

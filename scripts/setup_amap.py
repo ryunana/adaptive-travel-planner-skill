@@ -4,23 +4,37 @@ import getpass
 import json
 import os
 import tempfile
+import warnings
 from pathlib import Path
 
-from travel_common import DEFAULT_CONFIG, JsonArgumentParser, emit, load_config
+from travel_common import (
+    DEFAULT_CONFIG,
+    ConfigurationInvalid,
+    JsonArgumentParser,
+    emit,
+    load_config,
+)
 
 
 def configure(path=DEFAULT_CONFIG, offer_setup=True):
     path = Path(path)
     try:
-        key = getpass.getpass("AMap Web Service API key (hidden): ").strip()
-    except EOFError:
+        config = load_config(path)
+    except ConfigurationInvalid:
+        return {"ok": False, "error": {"code": "configuration_invalid", "message": "Existing AMap configuration is invalid and was not changed"}}
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", getpass.GetPassWarning)
+            key = getpass.getpass("AMap Web Service API key (hidden): ").strip()
+    except (EOFError, getpass.GetPassWarning):
         return {"ok": False, "error": {"code": "input_unavailable", "message": "No interactive input is available; run this command in a terminal"}}
     if not key:
         return {"ok": False, "error": {"code": "missing_key", "message": "No key was provided"}}
     try:
+        parent_existed = path.parent.exists()
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        os.chmod(path.parent, 0o700)
-        config = load_config(path)
+        if not parent_existed or path.parent == DEFAULT_CONFIG.parent:
+            os.chmod(path.parent, 0o700)
         config["amap"] = {"enabled": True, "api_key": key}
         config.setdefault("onboarding", {})["offer_amap_setup"] = bool(offer_setup)
         fd, temporary = tempfile.mkstemp(prefix=".config-", suffix=".tmp", dir=str(path.parent))
@@ -40,8 +54,8 @@ def configure(path=DEFAULT_CONFIG, offer_setup=True):
                 pass
             raise
         return {"ok": True, "configured": True, "path": str(path), "key_source": "file", "permissions": "0600"}
-    except OSError as exc:
-        return {"ok": False, "error": {"code": "config_write_failed", "message": str(exc)}}
+    except OSError:
+        return {"ok": False, "error": {"code": "config_write_failed", "message": "Could not write AMap configuration"}}
 
 
 def main(argv=None):

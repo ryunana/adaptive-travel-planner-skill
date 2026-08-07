@@ -1,6 +1,5 @@
 import json
 import os
-import stat
 import sys
 import tempfile
 import unittest
@@ -45,6 +44,23 @@ class CapabilityTests(unittest.TestCase):
         result = check_capabilities.detect(config_path=self.config)
         self.assertEqual(result["amap"]["key_source"], "environment")
         self.assertNotIn("secret", json.dumps(result))
+
+    def test_corrupt_configuration_has_distinct_fail_closed_state(self):
+        import check_capabilities
+        self.config.write_bytes(b'{"amap": invalid\xff')
+        result = check_capabilities.detect(config_path=self.config)
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["amap"]["state"], "configuration_invalid")
+        self.assertEqual(result["error"]["code"], "configuration_invalid")
+
+    def test_numeric_and_blank_keys_are_not_configured(self):
+        import check_capabilities
+        for key in (123, "   "):
+            with self.subTest(key=key):
+                self.config.write_text(json.dumps({"amap": {"enabled": True, "api_key": key}}))
+                result = check_capabilities.detect(config_path=self.config)
+                self.assertFalse(result["ok"])
+                self.assertEqual(result["error"]["code"], "configuration_invalid")
 
 
 if __name__ == "__main__":

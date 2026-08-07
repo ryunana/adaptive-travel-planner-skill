@@ -143,6 +143,12 @@ key_source=environment
 | B9 | Medium / Reliability | fixed | HTTP 响应读取中断可能泄漏 traceback | `HTTPException` 映射为脱敏结构化 `network_error` |
 | B10 | Medium / Installability | fixed | Codex 安装目录过时且父目录不存在；发现元数据为截断残句 | 使用当前 `.agents/skills`、skills.sh 安装与完整 64 字符描述；发布检查验证边界和基本一致性 |
 | B11 | High / Supply chain | fixed | CI action 使用可变标签且 checkout 保留凭据 | 两个 job 均固定官方不可变版本并关闭凭据持久化；zizmor 无未抑制 finding |
+| B12 | Critical / Decision correctness | fixed | hard gate 的 pass/fail 可与 unknown/login_required 证据矛盾 | 未知证据只允许 undecidable；pending gate 强制非空名称与精确处理动作 |
+| B13 | High / Secret safety | fixed | 参数错误与非 TTY 隐藏输入可能回显 Key | 所有参数错误使用通用消息；GetPassWarning fail-closed 且不写配置 |
+| B14 | High / JSON contract | fixed | 非标准常量、无限输入/响应及输出序列化可破坏严格 JSON | 全局严格解析/输出；本地输入 1 MiB、provider 响应 2 MiB 上限及边界回归 |
+| B15 | High / Configuration safety | fixed | 损坏配置可被覆盖，任意已有父目录权限可被改变 | 损坏配置独立状态并逐字节保留；只保护默认或新建目录权限 |
+| B16 | High / Provider validation | fixed | AMap 成功状态缺少端点结构、畸形本地参数仍可进入网络 | geocode/route/weather 分别验证容器与记录；地址、坐标、adcode 在网络前验证 |
+| B17 | High / Release integrity | fixed | 非 UTF-8 文件 fail-open、非法 YAML 与 reference/fragment 链接漏检 | 混合编码 fail-closed；PyYAML safe_load；完整本地链接与 heading 检查 |
 | I1 | Info / Release state | untestable | README 公网 clone 目前只能得到 main，不含 V2 | 发布后按同一走查重测 |
 
 ## 6. 已决策评分语义
@@ -180,11 +186,11 @@ level = high when value >= 0.8, medium when value >= 0.5, otherwise low
 
 ## 8. 最终验证
 
-最终 V2 树包含结构化 CLI 错误、输入 shape 检查、评分语义修复、AMap 畸形 location 保护、发布检查、模板和回归测试；本报告只记录可复现的最终行为，不依赖中间开发历史。
+最终 V2 树包含结构化 CLI 错误、严格有界 JSON、候选/行程完整 shape 检查、hard-gate 证据一致性、AMap 端点与本地参数验证、损坏配置保护、真实 YAML/链接/隐私发布检查、模板和回归测试；本报告只记录可复现的最终行为，不依赖中间开发历史。
 
 ```text
 $ python3 -m unittest discover -s tests
-Ran 53 tests
+Ran 72 tests
 OK
 
 $ python3 scripts/release_checks.py
@@ -201,6 +207,6 @@ $ uvx zizmor .github/workflows/ci.yml
 No findings to report
 ```
 
-评分语义回归验证 rank=`1,1,3`、tied=`true,true,false`、1/9 verified confidence=`coverage .111 / authority 1.0 / value .111`、无已有记录时 authority=`0.0`。畸形候选/行程输入、布尔和非有限数值、timeout 边界、AMap 中断响应均有回归；所有 CLI 错误保持单一可解析 JSON、非零退出且 stderr 无 traceback。AMap 畸形 location fixture 回归验证 geocode 阶段结构化 `malformed_response` 且不调用 route/weather。
+评分语义回归验证 rank=`1,1,3`、tied=`true,true,false`、1/9 verified confidence=`coverage .111 / authority 1.0 / value .111`、无已有记录时 authority=`0.0`。畸形候选/行程输入、矛盾 hard gate、布尔和非有限数值、timeout、输入/响应尺寸边界、AMap 中断与端点响应 shape、损坏配置、混合编码、非法 YAML、reference/fragment 链接均有回归；所有 CLI 错误保持单一严格 JSON、非零退出且 stderr 无 traceback/secret。AMap 畸形 location fixture 回归验证 geocode 阶段结构化 `malformed_response` 且不调用 route/weather。
 
 仓库内容隐私扫描无命中；`git ls-remote --heads origin agent/china-destination-selection-v2` 无输出，确认未推送该分支。本次没有执行 push，也没有切换分支或改动 main。

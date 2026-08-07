@@ -7,6 +7,8 @@ import subprocess
 from pathlib import Path
 from urllib.parse import unquote
 
+import yaml  # type: ignore[import-untyped]
+
 ROOT = Path(__file__).resolve().parents[1]
 
 REQUIRED_RESOURCES = (
@@ -35,6 +37,19 @@ KEY_ASSIGNMENT = re.compile(
     re.IGNORECASE,
 )
 MARKDOWN_LINK = re.compile(r"\[[^]]*\]\(([^)]+)\)")
+REFERENCE_USAGE = re.compile(r"(?<!!)\[[^]]+\]\[([^]]+)\]")
+REFERENCE_DEFINITION = re.compile(r"^\s*\[([^]]+)\]:\s*(\S+)", re.MULTILINE)
+HEADING = re.compile(r"^#{1,6}\s+(.+?)\s*#*\s*$", re.MULTILINE)
+
+
+def _yaml_mapping(text: str, label: str):
+    try:
+        value = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        raise ValueError(f"{label} is invalid YAML") from exc
+    if not isinstance(value, dict):
+        raise TypeError(f"{label} must be a YAML mapping")
+    return value
 
 
 def validate_skill_metadata(path: Path) -> list[str]:
@@ -52,17 +67,16 @@ def validate_skill_metadata(path: Path) -> list[str]:
     if not body.strip():
         return ["SKILL.md must have a non-empty body"]
 
-    fields: dict[str, str] = {}
-    for line in frontmatter.splitlines():
-        if line and not line[0].isspace() and ":" in line:
-            key, value = line.split(":", 1)
-            fields[key.strip()] = value.strip().strip("\"'")
+    try:
+        fields = _yaml_mapping(frontmatter, "SKILL.md frontmatter")
+    except (TypeError, ValueError) as exc:
+        return [str(exc)]
 
     issues = []
     for field in ("name", "description"):
-        if not fields.get(field):
+        if not isinstance(fields.get(field), str) or not fields[field].strip():
             issues.append(f"SKILL.md frontmatter must define a non-empty {field}")
-    if fields.get("name") and not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", fields["name"]):
+    if isinstance(fields.get("name"), str) and fields["name"] and not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", fields["name"]):
         issues.append("SKILL.md name must use lowercase hyphenated form")
     return issues
 
@@ -77,31 +91,30 @@ def validate_openai_metadata(skill_path: Path, metadata_path: Path) -> list[str]
 
     closing = skill_text.find("\n---\n", 4)
     frontmatter = skill_text[4:closing] if skill_text.startswith("---\n") and closing != -1 else ""
-    skill_fields = {}
-    for line in frontmatter.splitlines():
-        if line and not line[0].isspace() and ":" in line:
-            key, value = line.split(":", 1)
-            skill_fields[key.strip()] = value.strip().strip("\"'")
-
-    openai_fields = {}
-    for line in metadata_text.splitlines():
-        match = re.match(r"\s+(display_name|short_description):\s*[\"']?(.*?)[\"']?\s*$", line)
-        if match:
-            openai_fields[match.group(1)] = match.group(2)
+    try:
+        skill_fields = _yaml_mapping(frontmatter, "SKILL.md frontmatter")
+        metadata = _yaml_mapping(metadata_text, "openai.yaml")
+    except (TypeError, ValueError) as exc:
+        return [str(exc)]
+    openai_fields = metadata.get("interface")
+    if not isinstance(openai_fields, dict):
+        return ["openai.yaml interface must be a YAML mapping"]
 
     name = skill_fields.get("name", "")
     description = skill_fields.get("description", "")
+    if not isinstance(name, str) or not isinstance(description, str):
+        return ["SKILL.md name and description must be strings"]
     expected_display_name = name.replace("-", " ").title()
     short_description = openai_fields.get("short_description", "")
 
     issues = []
-    if openai_fields.get("display_name") != expected_display_name:
+    if not isinstance(openai_fields.get("display_name"), str) or openai_fields.get("display_name") != expected_display_name:
         issues.append("openai.yaml display_name must match SKILL.md name")
-    if not short_description.strip():
+    if not isinstance(short_description, str) or not short_description.strip():
         issues.append("openai.yaml short_description must be non-empty")
     elif len(short_description) > 64:
         issues.append("openai.yaml short_description must be at most 64 characters")
-    if short_description.strip() and description and short_description.split()[0].lower() != description.split()[0].lower():
+    if isinstance(short_description, str) and short_description.strip() and description and short_description.split()[0].lower() != description.split()[0].lower():
         issues.append("openai.yaml short_description must be consistent with SKILL.md description")
     return issues
 
@@ -115,7 +128,11 @@ def scan_privacy(root: Path, files: list[Path]) -> list[str]:
     for path in files:
         try:
             text = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeError):
+        except UnicodeError:
+            issues.append(f"{path.relative_to(root)}: cannot decode tracked file as UTF-8")
+            continue
+        except OSError:
+            issues.append(f"{path.relative_to(root)}: cannot read tracked file")
             continue
         relative = path.relative_to(root)
         for line_number, line in enumerate(text.splitlines(), 1):
@@ -135,21 +152,58 @@ def validate_markdown_links(root: Path, files: list[Path]) -> list[str]:
             text = path.read_text(encoding="utf-8")
         except (OSError, UnicodeError):
             continue
-        for line_number, line in enumerate(text.splitlines(), 1):
-            for raw_target in MARKDOWN_LINK.findall(line):
-                target = raw_target.strip().split(maxsplit=1)[0].strip("<>\"'")
-                if not target or target.startswith(("#", "http://", "https://", "mailto:")):
-                    continue
-                target = unquote(target.split("#", 1)[0])
-                resolved = (path.parent / target).resolve()
+        scan_text = _without_markdown_code(text)
+        definitions = {name.casefold(): target for name, target in REFERENCE_DEFINITION.findall(scan_text)}
+        for reference in REFERENCE_USAGE.findall(scan_text):
+            if reference.casefold() not in definitions:
+                issues.append(f"{path.relative_to(root)}: undefined reference link: {reference}")
+        targets = [(match.start(), match.group(1)) for match in MARKDOWN_LINK.finditer(scan_text)]
+        targets.extend((match.start(), match.group(2)) for match in REFERENCE_DEFINITION.finditer(scan_text))
+        for position, raw_target in targets:
+            line_number = text.count("\n", 0, position) + 1
+            target = raw_target.strip().split(maxsplit=1)[0].strip("<>\"'")
+            if not target or target.startswith(("http://", "https://", "mailto:")):
+                continue
+            file_part, separator, fragment = target.partition("#")
+            decoded_path = unquote(file_part)
+            resolved = (path.parent / decoded_path).resolve() if decoded_path else path.resolve()
+            try:
+                resolved.relative_to(root.resolve())
+            except ValueError:
+                issues.append(f"{path.relative_to(root)}:{line_number}: link escapes repository: {target}")
+                continue
+            if not resolved.exists():
+                issues.append(f"{path.relative_to(root)}:{line_number}: broken local link: {decoded_path}")
+                continue
+            if separator and fragment and resolved.suffix.lower() == ".md":
                 try:
-                    resolved.relative_to(root.resolve())
-                except ValueError:
-                    issues.append(f"{path.relative_to(root)}:{line_number}: link escapes repository: {target}")
+                    destination_text = resolved.read_text(encoding="utf-8")
+                except (OSError, UnicodeError):
+                    issues.append(f"{path.relative_to(root)}:{line_number}: cannot inspect link fragment: {target}")
                     continue
-                if not resolved.exists():
-                    issues.append(f"{path.relative_to(root)}:{line_number}: broken local link: {target}")
+                headings = {_heading_slug(value) for value in HEADING.findall(destination_text)}
+                if unquote(fragment).casefold() not in headings:
+                    issues.append(f"{path.relative_to(root)}:{line_number}: broken heading fragment: {fragment}")
     return issues
+
+
+def _heading_slug(value: str) -> str:
+    value = re.sub(r"[^\w\- ]", "", value.casefold(), flags=re.UNICODE)
+    return re.sub(r"[ -]+", "-", value).strip("-")
+
+
+def _without_markdown_code(text: str) -> str:
+    output = []
+    fenced = False
+    for line in text.splitlines(keepends=True):
+        if line.lstrip().startswith("```"):
+            fenced = not fenced
+            output.append("\n" if line.endswith("\n") else "")
+        elif fenced:
+            output.append("\n" if line.endswith("\n") else "")
+        else:
+            output.append(re.sub(r"`[^`]*`", "", line))
+    return "".join(output)
 
 
 def tracked_files(root: Path) -> list[Path]:

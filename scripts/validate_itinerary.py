@@ -2,7 +2,7 @@
 """Validate itinerary dates, load, topology, and dynamic evidence."""
 from datetime import date
 
-from travel_common import JsonArgumentParser, emit, read_json
+from travel_common import JsonArgumentParser, TravelInputError, emit, read_json
 
 
 def issue(code, message, path=None):
@@ -34,7 +34,10 @@ def validate(payload):
         else:
             expected_nights = (end - start).days
             expected_days = expected_nights + 1
-        if payload.get("hotel_nights") != expected_nights:
+        hotel_nights = payload.get("hotel_nights")
+        if isinstance(hotel_nights, bool) or not isinstance(hotel_nights, int) or hotel_nights < 0:
+            issues.append(issue("hotel_nights_invalid", "hotel_nights must be a nonnegative integer", "hotel_nights"))
+        elif hotel_nights != expected_nights:
             issues.append(issue("hotel_nights_mismatch", "hotel_nights must equal the number of nights in the date range", "hotel_nights"))
         days = payload.get("days", [])
         if len(days) != expected_days:
@@ -62,14 +65,14 @@ def validate(payload):
     first_seen = {}
     for index, location in enumerate(route):
         if location in first_seen and index - first_seen[location] > 1:
-            issues.append(issue("route_backtracking", "route returns to a previously departed location", "route[{}]".format(index)))
+            issues.append(issue("route_backtracking", "route returns to a previously departed location", f"route[{index}]"))
             break
         first_seen[location] = index
 
     allowed_status = {"verified", "auxiliary", "unknown", "login_required"}
     for index, claim in enumerate(payload.get("dynamic_claims", [])):
         status = claim.get("status")
-        path = "dynamic_claims[{}]".format(index)
+        path = f"dynamic_claims[{index}]"
         if not isinstance(status, str) or status not in allowed_status:
             issues.append(issue("evidence_status_invalid", "dynamic claim has an invalid evidence status", path))
             continue
@@ -96,7 +99,8 @@ def main(argv=None):
     try:
         result = validate(read_json(args.input))
     except (OSError, ValueError) as exc:
-        result = {"ok": False, "issue_count": 1, "issues": [issue("invalid_input", str(exc))]}
+        code = exc.code if isinstance(exc, TravelInputError) else "invalid_input"
+        result = {"ok": False, "issue_count": 1, "issues": [issue(code, str(exc))]}
     return emit(result, 0 if result["ok"] else 1)
 
 

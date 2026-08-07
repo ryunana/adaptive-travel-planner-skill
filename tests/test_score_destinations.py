@@ -23,6 +23,47 @@ def candidate(name, score: float = 4.0, status="verified", gates=None):
 
 
 class ScoreTests(unittest.TestCase):
+    def test_requires_one_to_three_complete_candidates(self):
+        import score_destinations
+        invalid_payloads = (
+            {"candidates": []},
+            {"candidates": [candidate(str(index)) for index in range(4)]},
+        )
+        for payload in invalid_payloads:
+            with self.subTest(payload=payload):
+                result = score_destinations.score_payload(payload)
+                self.assertFalse(result["ok"])
+                self.assertEqual(result["error"]["code"], "invalid_candidates")
+
+        for field, value in (
+            ("normalized_form", " "),
+            ("minimum_viable_days", 0),
+            ("minimum_viable_days", True),
+            ("minimum_viable_days", math.nan),
+            ("destination_potential", []),
+            ("this_trip_suitability", {}),
+            ("better_window", 3),
+        ):
+            item = candidate("A")
+            item[field] = value
+            with self.subTest(field=field, value=value):
+                result = score_destinations.score_payload({"candidates": [item]})
+                self.assertFalse(result["ok"])
+                self.assertEqual(result["error"]["code"], "invalid_candidate")
+
+    def test_unknown_gate_evidence_requires_complete_undecidable_gate(self):
+        import score_destinations
+        for gate in (
+            {"name": "transport", "state": "pass", "evidence_status": "unknown"},
+            {"name": "transport", "state": "fail", "evidence_status": "login_required"},
+            {"name": "", "state": "undecidable", "evidence_status": "unknown", "resolution_action": "verify"},
+            {"name": "transport", "state": "undecidable", "evidence_status": "unknown", "resolution_action": " "},
+        ):
+            with self.subTest(gate=gate):
+                result = score_destinations.score_payload({"candidates": [candidate("A", gates=[gate])]})
+                self.assertFalse(result["ok"])
+                self.assertEqual(result["error"]["code"], "invalid_candidate")
+
     def test_weights_reject_nonfinite_and_boolean_values(self):
         import score_destinations
         for invalid in (math.nan, math.inf, -math.inf, True, False):

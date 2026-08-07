@@ -4,11 +4,24 @@ import shutil
 import sys
 from pathlib import Path
 
-from travel_common import DEFAULT_CONFIG, JsonArgumentParser, emit, get_api_key
+from travel_common import (
+    DEFAULT_CONFIG,
+    ConfigurationInvalid,
+    JsonArgumentParser,
+    emit,
+    get_api_key,
+)
 
 
 def detect(config_path=None):
-    key, source = get_api_key(config_path)
+    try:
+        key, source = get_api_key(config_path)
+    except ConfigurationInvalid:
+        return {
+            "ok": False,
+            "error": {"code": "configuration_invalid", "message": "AMap configuration is invalid"},
+            "amap": {"state": "configuration_invalid", "installed": True, "configured": False, "verified": False, "key_source": None},
+        }
     amap_state = "configured_but_unverified" if key else "installed_but_unconfigured"
     return {
         "ok": True,
@@ -23,7 +36,8 @@ def main(argv=None):
     parser = JsonArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG, help="configuration file path")
     args = parser.parse_args(argv)
-    return emit(detect(args.config))
+    result = detect(args.config)
+    return emit(result, 0 if result["ok"] else 1)
 
 
 if __name__ == "__main__":

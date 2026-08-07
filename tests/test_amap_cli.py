@@ -15,7 +15,7 @@ class Response:
     def __init__(self, payload): self.payload = payload
     def __enter__(self): return self
     def __exit__(self, *args): return False
-    def read(self): return self.payload
+    def read(self, size=-1): return self.payload if size < 0 else self.payload[:size]
 
 
 def payload(name):
@@ -65,7 +65,7 @@ class AMapClientTests(unittest.TestCase):
     def test_incomplete_response_is_structured_and_redacted(self):
         import amap_cli
         class IncompleteResponse(Response):
-            def read(self):
+            def read(self, size=-1):
                 raise http.client.IncompleteRead(b"partial", 100)
         def opener(request, timeout):
             return IncompleteResponse(b"")
@@ -81,6 +81,56 @@ class AMapClientTests(unittest.TestCase):
         weather = self.client("amap_weather_success.json").weather("110000")
         self.assertTrue(weather["ok"])
         self.assertEqual(weather["data"]["forecasts"][0]["city"], "北京市")
+
+    def test_endpoint_payload_shapes_are_validated(self):
+        import amap_cli
+        cases = (
+            ("geocode", {"status": "1"}),
+            ("geocode", {"status": "1", "geocodes": "bad"}),
+            ("route", {"status": "1", "route": {}}),
+            ("route", {"status": "1", "route": {"paths": "bad"}}),
+            ("weather", {"status": "1", "forecasts": {}}),
+        )
+        for method, value in cases:
+            with self.subTest(method=method, value=value):
+                raw = json.dumps(value).encode()
+                client = amap_cli.AMapClient(SECRET, opener=lambda request, timeout, raw=raw: Response(raw))
+                if method == "geocode":
+                    result = client.geocode("x")
+                elif method == "route":
+                    result = client.route("1,1", "2,2")
+                else:
+                    result = client.weather("110000")
+                self.assertFalse(result["ok"])
+                self.assertEqual(result["error"]["code"], "malformed_response")
+
+        client = amap_cli.AMapClient(SECRET, opener=lambda request, timeout: Response(b'{"status":"1","geocodes":NaN}'))
+        self.assertEqual(client.geocode("x")["error"]["code"], "malformed_response")
+
+    def test_provider_response_size_boundary(self):
+        import amap_cli
+        valid = json.dumps({"status": "1", "geocodes": []}).encode()
+        padding = b" " * (amap_cli.MAX_RESPONSE_BYTES - len(valid))
+        below = amap_cli.AMapClient(SECRET, opener=lambda request, timeout: Response(valid + padding)).geocode("x")
+        above = amap_cli.AMapClient(SECRET, opener=lambda request, timeout: Response(valid + padding + b" ")).geocode("x")
+        self.assertTrue(below["ok"])
+        self.assertEqual(above["error"]["code"], "malformed_response")
+
+    def test_local_argument_validation_prevents_network_calls(self):
+        import amap_cli
+        calls = []
+        client = amap_cli.AMapClient(SECRET, opener=lambda request, timeout: calls.append(request))
+        cases = (
+            lambda: client.geocode(" "),
+            lambda: client.route("NaN,1", "2,2"),
+            lambda: client.route("181,1", "2,2"),
+            lambda: client.weather("abc"),
+        )
+        for invoke in cases:
+            with self.subTest(invoke=invoke):
+                result = invoke()
+                self.assertEqual(result["error"]["code"], "invalid_arguments")
+        self.assertEqual(calls, [])
 
 
 if __name__ == "__main__": unittest.main()

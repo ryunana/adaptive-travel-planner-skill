@@ -71,5 +71,14 @@ class ItineraryTests(unittest.TestCase):
         codes = {item["code"] for item in validate_itinerary.validate(payload)["issues"]}
         self.assertIn("load_limit_invalid", codes)
 
+    def test_hotel_nights_rejects_boolean_but_accepts_zero(self):
+        import validate_itinerary
+        payload = load("itinerary_valid.json")
+        payload.update(start_date="2026-08-07", end_date="2026-08-07", hotel_nights=0)
+        payload["days"] = [{"date": "2026-08-07", "core_activities": []}]
+        self.assertNotIn("hotel_nights_invalid", {item["code"] for item in validate_itinerary.validate(payload)["issues"]})
+        payload["hotel_nights"] = False
+        self.assertIn("hotel_nights_invalid", {item["code"] for item in validate_itinerary.validate(payload)["issues"]})
+
 
 if __name__ == "__main__": unittest.main()
