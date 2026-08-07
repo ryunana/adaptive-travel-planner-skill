@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_live_amap:
+        description: Run the secret-gated live AMap smoke test
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  fixture-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run fixture-backed script tests
+        env:
+          AMAP_API_KEY: ""
+        run: python -m unittest discover -s tests -v
+      - name: Validate Skill metadata, resources, links, and privacy
+        run: python scripts/release_checks.py
+
+  live-amap-smoke:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_live_amap
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Require an authorized AMap secret
+        env:
+          AMAP_API_KEY: ${{ secrets.AMAP_API_KEY }}
+        run: test -n "$AMAP_API_KEY"
+      - name: Verify live AMap geocoding, route, and baseline weather
+        env:
+          AMAP_API_KEY: ${{ secrets.AMAP_API_KEY }}
+        run: python scripts/verify_amap.py

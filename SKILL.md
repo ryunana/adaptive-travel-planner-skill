@@ -1,6 +1,6 @@
 ---
 name: adaptive-travel-planner
-description: Compare, audit, and adapt leisure travel plans using a private traveler profile, live weather and opening data, route topology, composite fatigue, and explicit go/defer/cancel decisions. Use for destination selection, itinerary review, same-day replanning, transport, hotels, attractions, food, packing, and post-trip calibration.
+description: Compare vague or mixed-granularity mainland China destination candidates, audit itineraries, and adapt leisure travel plans using a private traveler profile, live operational evidence, route topology, composite fatigue, and explicit go/conditional/defer/cancel decisions. Use when the destination is undecided, when choosing among regions or cities, or for itinerary review, same-day replanning, transport, hotels, attractions, food, packing, and post-trip calibration.
 ---
 
 # Adaptive Travel Planner
@@ -37,6 +37,21 @@ Read:
 
 Do not require the entire profile to be completed before helping.
 
+## Decision Routing and Progressive Loading
+
+First identify the route:
+
+- **Destination undecided, vague candidates, mixed city/region/route granularity, or possible city replacement:** read `references/destination-selection.md` and use `templates/trip-brief.template.md` only as needed.
+- **Destination already chosen:** continue with the current-state and itinerary workflow below.
+
+For destination selection, load detailed references only when their step begins:
+
+- research or evidence classification: `references/source-policy-cn.md`;
+- capability detection, AMap explanation, or setup: `references/capability-matrix.md`;
+- hard-gate evaluation, ranking, or confidence: `references/scoring-model.md`.
+
+Do not preload source, adapter, or scoring detail for an itinerary-only request. The destination-selection route must normalize each candidate, apply three-state hard gates before scores, screen every candidate, deep-research only the leaders, and keep unresolved gates explicit.
+
 ## Current-State Gate
 
 Before planning, establish:
@@ -69,7 +84,7 @@ State source and query time for facts that can drift. If a query fails, report u
 
 ### 1. Identify the Decision
 
-Determine whether the user needs destination selection, itinerary comparison, same-day adjustment, transport, hotel, attraction sequencing, restaurant choice, packing, or post-trip review.
+Determine whether the user needs destination selection, itinerary comparison, same-day adjustment, transport, hotel, attraction sequencing, restaurant choice, packing, or post-trip review. If destination selection applies, follow `references/destination-selection.md` through Stages A-F before producing a detailed rank-1 itinerary; do not generate several disposable detailed itineraries.
 
 ### 2. Audit Route Topology
 

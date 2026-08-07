@@ -89,7 +89,7 @@ cp templates/traveler-profile.template.md references/traveler-profile.md
 ln -s "$(pwd)" ~/.codex/skills/adaptive-travel-planner
 ```
 
-不同 Agent 工具的 Skill 目录和格式可能不同，请以对应工具的文档为准。核心内容都在 `SKILL.md` 和 `references/` 中，可以按需要迁移。
+Hermes Agent 可将仓库放到或链接到 `$HERMES_HOME/skills/`（未自定义时通常是 `~/.hermes/skills/`）；Claude Code 可按其当前文档放到 `~/.claude/skills/`。不同 Agent 工具的 Skill 目录和格式可能变化，请以对应工具的当前官方文档为准。核心内容都在 `SKILL.md` 和 `references/` 中，可以按需要迁移；后续新增的 `agents/openai.yaml` 仅用于 Codex 元数据发现，不代表核心 Skill 只能在 Codex 中使用。
 
 ### 4. 在普通聊天 AI 中使用
 
@@ -102,6 +102,14 @@ ln -s "$(pwd)" ~/.codex/skills/adaptive-travel-planner
 ## 怎么提问
 
 适合的请求：
+
+目的地还很模糊时，不必先选定城市，也不必让 AI 同时生成几份很快过期的详细行程。例如：
+
+```text
+我有 8 天时间，夏天从上海出发，正在考虑北疆、甘南和滇西北，但区域大小并不一致。
+先把它们整理成 8 天内可比较的路线，核验天气、交通和人流风险，淘汰不适合本次旅行的选项；
+然后只为第一名做完整日程，并给第二名一条可切换的简要路线。
+```
 
 ```text
 我明天下午从当前酒店出发。比较继续留在这里、去附近室内项目、直接换城市三个方案。
@@ -125,6 +133,29 @@ ln -s "$(pwd)" ~/.codex/skills/adaptive-travel-planner
 
 这种请求缺少日期、当前状态和个人画像，AI很容易退回大众模板。
 
+## 零配置模式与高德增强模式
+
+默认的**零配置模式**不需要 API Key：Skill 使用当前 Agent 已有的搜索或浏览能力，按官方渠道优先的证据规则比较候选地。它适合先筛选目的地，也能在高德不可用时继续工作；登录后才能看到的 12306、酒店或票务库存会明确标为 `login_required`，不会被猜测。
+
+可选的**高德增强模式**通过仓库内的官方 Web Service API 适配器，改善以下信息：
+
+- 地址解析与坐标确认；
+- 驾车路线、距离、预计时长和通行费参考；
+- 城市级短期基础天气，作为气象与政府来源之外的辅助证据。
+
+它**不会**提供或改善铁路余票、航班与酒店实时价格、景区票量、景区微气候和现场人流，也不能代替相关第一方渠道。尤其在出发前 **8至14天** 的天气决策窗口，高德增强模式没有承诺的预报覆盖增量；仍应使用正常预报来源观察趋势，并保持切换目的地的余地。
+
+### 安全设置高德 Key
+
+先在[高德开放平台](https://lbs.amap.com/api/webservice/guide/create-project/get-key)完成开发者认证，创建 **Web 服务** Key，再运行：
+
+```bash
+python3 scripts/setup_amap.py
+python3 scripts/verify_amap.py
+```
+
+设置脚本使用隐藏输入，不接受命令行参数中的 Key；配置保存在 `~/.config/adaptive-travel-planner/config.json`，并以仅当前用户可读写的权限原子写入。不要把 Key 粘贴到聊天、Issue、日志或仓库文件中。CI 等高级场景可以临时使用 `AMAP_API_KEY` 环境变量覆盖本地配置。安装文件存在不代表能力可用，只有地址解析、路线和基础天气三步真实验证通过后，才应标记为 `verified_working`。
+
 ## 标准输出应该包含什么
 
 Skill 要求 AI 首先比较 2至3个**实质不同**的方案：
@@ -133,6 +164,16 @@ Skill 要求 AI 首先比较 2至3个**实质不同**的方案：
 |---|---|---|---|---|---|---|---|
 
 比较后必须给出排序和明确首选。
+
+目的地未定时，比较结果会先展示原始候选、归一化后的本次路线与最少可行天数，再给出证据状态、硬门槛和评分。例如：
+
+| 排名 | 原始候选 → 本次比较形态 | 最少可行天数 | 动态证据 | 硬门槛 | 本次结论 |
+|---:|---|---:|---|---|---|
+| 1 | 滇西北 → 丽江—香格里拉 8 日 | 7 | 天气已核验；交通待用户确认余票 | `undecidable` | 条件成立时首选 |
+| 2 | 甘南 → 兰州进出小环线 8 日 | 8 | 路线与天气已核验 | `pass` | 可切换备选 |
+| — | 北疆大环线 → 无法压缩为 8 日 | 12 | 不进入评分 | `fail` | 延期，说明更合适窗口 |
+
+最终输出包含一句话排序结论、每个候选的证据比较、第一名完整日程、第二名简要路线与切换条件、延期理由、72 小时复核清单，以及所有未决硬门槛的 `pending_gates`。第二名不是可直接执行的旧备份；触发切换时需要重新核验超过 24 小时的动态信息。
 
 每个核心项目还应包含：
 
@@ -194,11 +235,22 @@ Skill 要求 AI 首先比较 2至3个**实质不同**的方案：
 ├── PRIVACY.md                            # 隐私与脱敏建议
 ├── CONTRIBUTING.md                       # 同好贡献说明
 ├── LICENSE
+├── agents/
+│   └── openai.yaml                        # Codex 发现元数据
+├── docs/specs/
+│   └── 2026-08-07-china-destination-selection-v2-design.md
 ├── references/
-│   └── planning-contract.md              # 输出、核验与审计契约
+│   ├── capability-matrix.md               # 零配置与高德能力边界
+│   ├── destination-selection.md           # 候选地筛选流程
+│   ├── planning-contract.md               # 输出、核验与审计契约
+│   ├── scoring-model.md                   # 硬门槛、评分与置信度
+│   └── source-policy-cn.md                # 中国大陆动态信息来源策略
+├── scripts/                               # 检测、设置、评分与校验脚本
 ├── templates/
-│   ├── traveler-profile.template.md      # 私人画像空白模板
-│   └── portable-prompt.template.md       # 普通聊天 AI 提示词
+│   ├── portable-prompt.template.md        # 普通聊天 AI 提示词
+│   ├── traveler-profile.template.md       # 私人画像空白模板
+│   └── trip-brief.template.md             # 目的地决策简报模板
+├── tests/                                 # 无真实 Key 的 fixture 测试
 └── examples/
     └── fictional-traveler-profile.md     # 完全虚构的填写示例
 ```

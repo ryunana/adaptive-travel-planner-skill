@@ -12,6 +12,9 @@ screenshots/
 *.db
 *.cookie
 *.cookies
+config.json
+*.key
+*.pem
 
 # Raw personal exports
 *.eml
@@ -25,3 +28,9 @@ screenshots/
 .DS_Store
 .idea/
 .vscode/
+
+# Python build and test artifacts
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
