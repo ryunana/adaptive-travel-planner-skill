@@ -1,5 +1,6 @@
 import json
 import sys
+import time
 import unittest
 from pathlib import Path
 
@@ -70,6 +71,46 @@ class ItineraryTests(unittest.TestCase):
         payload["max_core_activities_per_day"] = True
         codes = {item["code"] for item in validate_itinerary.validate(payload)["issues"]}
         self.assertIn("load_limit_invalid", codes)
+
+    def test_dynamic_claim_requires_complete_freshness_record(self):
+        import validate_itinerary
+        base = {"field": "opening_status", "valid_for": "2026-08-07", "status": "verified", "value": "open", "source": "official", "queried_at": "2026-08-07T12:00:00Z"}
+        for field in ("field", "valid_for"):
+            claim = dict(base)
+            claim.pop(field)
+            payload = load("itinerary_valid.json")
+            payload["dynamic_claims"] = [claim]
+            self.assertIn("evidence_record_invalid", {item["code"] for item in validate_itinerary.validate(payload)["issues"]})
+        for timestamp in ("not-a-timestamp", "2026-08-07T12:00:00"):
+            payload = load("itinerary_valid.json")
+            payload["dynamic_claims"] = [dict(base, queried_at=timestamp)]
+            self.assertIn("evidence_query_time_invalid", {item["code"] for item in validate_itinerary.validate(payload)["issues"]})
+        for timestamp in ("2026-08-07T12:00:00Z", "2026-08-07T12:00:00+08:00"):
+            payload = load("itinerary_valid.json")
+            payload["dynamic_claims"] = [dict(base, queried_at=timestamp)]
+            self.assertTrue(validate_itinerary.validate(payload)["ok"])
+
+    def test_unknown_claim_without_value_is_valid_when_record_is_complete(self):
+        import validate_itinerary
+        for status in ("unknown", "login_required"):
+            payload = load("itinerary_valid.json")
+            payload["dynamic_claims"] = [{"field": "inventory", "valid_for": "2026-08-07", "value": None, "status": status, "source": None, "queried_at": "2026-08-07T12:00:00Z"}]
+            self.assertTrue(validate_itinerary.validate(payload)["ok"])
+
+    def test_supported_status_requires_source_even_without_value(self):
+        import validate_itinerary
+        for status in ("verified", "auxiliary"):
+            payload = load("itinerary_valid.json")
+            payload["dynamic_claims"] = [{"field": "inventory", "valid_for": "2026-08-07", "value": None, "status": status, "source": None, "queried_at": "2026-08-07T12:00:00Z"}]
+            self.assertIn("evidence_source_invalid", {item["code"] for item in validate_itinerary.validate(payload)["issues"]})
+
+    def test_wide_date_range_with_empty_days_returns_quickly(self):
+        import validate_itinerary
+        payload = {"start_date": "0001-01-01", "end_date": "9999-12-31", "hotel_nights": 0, "days": [], "route": []}
+        started = time.monotonic()
+        result = validate_itinerary.validate(payload)
+        self.assertLess(time.monotonic() - started, 0.5)
+        self.assertIn("day_count_mismatch", {item["code"] for item in result["issues"]})
 
     def test_hotel_nights_rejects_boolean_but_accepts_zero(self):
         import validate_itinerary

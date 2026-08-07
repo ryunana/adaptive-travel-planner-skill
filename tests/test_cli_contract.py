@@ -157,6 +157,25 @@ class CliContractTests(unittest.TestCase):
         self.assertNotEqual(exit_code, 0)
         self.assertEqual(json.loads(output.getvalue())["error"]["code"], "serialization_error")
 
+    def test_json_consumers_reject_nonfinite_exponents_and_deep_json(self):
+        for name in ("score_destinations", "validate_itinerary"):
+            for value in ('{"value":1e9999}', "[" * 2000 + "]" * 2000):
+                result = self.run_script(name, "-", input_text=value)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(result.stderr, "")
+                self.assertFalse(json.loads(result.stdout)["ok"])
+
+    def test_unreadable_input_error_does_not_echo_path(self):
+        canary = "CANARY_PRIVATE_PATH_1234567890"
+        path = "/tmp/" + canary + ".json"
+        for name in ("score_destinations", "validate_itinerary"):
+            result = self.run_script(name, path)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn(canary, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            codes = [payload.get("error", {}).get("code")] + [item.get("code") for item in payload.get("issues", [])]
+            self.assertIn("input_unreadable", codes)
+
     def test_network_timeouts_must_be_positive_and_finite(self):
         env = os.environ.copy()
         env.pop("AMAP_API_KEY", None)

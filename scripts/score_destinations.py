@@ -3,7 +3,13 @@
 import math
 from copy import deepcopy
 
-from travel_common import JsonArgumentParser, TravelInputError, emit, read_json
+from travel_common import (
+    JsonArgumentParser,
+    TravelInputError,
+    emit,
+    read_json,
+    validate_json_value,
+)
 
 DEFAULT_WEIGHTS = {
     "preference_fit": 25,
@@ -93,19 +99,30 @@ def score_payload(payload):
         return {"ok": False, "error": {"code": "invalid_weights", "message": "Weights must include exactly the eight documented dimensions"}}
     if any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in weights.values()):
         return {"ok": False, "error": {"code": "invalid_weights", "message": "Weights must be numeric"}}
-    weights = {key: float(value) for key, value in weights.items()}
+    try:
+        weights = {key: float(value) for key, value in weights.items()}
+    except (OverflowError, TypeError, ValueError):
+        return {"ok": False, "error": {"code": "invalid_weights", "message": "Weights must be finite numbers"}}
     if any(not math.isfinite(value) or value < 0 for value in weights.values()) or abs(sum(weights.values()) - 100) > 1e-9:
         return {"ok": False, "error": {"code": "invalid_weights", "message": "Weights must be nonnegative and total 100"}}
     raw_candidates = payload.get("candidates", [])
     if not isinstance(raw_candidates, list) or not 1 <= len(raw_candidates) <= 3 or any(not isinstance(candidate, dict) for candidate in raw_candidates):
         return {"ok": False, "error": {"code": "invalid_candidates", "message": "candidates must contain one to three JSON objects"}}
     for candidate in raw_candidates:
+        try:
+            validate_json_value(candidate)
+        except ValueError:
+            return {"ok": False, "error": {"code": "invalid_candidate", "message": "candidate nesting or numeric values are invalid"}}
         if not isinstance(candidate.get("name"), str) or not candidate["name"].strip():
             return {"ok": False, "error": {"code": "invalid_candidate", "message": "candidate name must be a non-empty string"}}
         if not isinstance(candidate.get("normalized_form"), str) or not candidate["normalized_form"].strip():
             return {"ok": False, "error": {"code": "invalid_candidate", "message": "candidate normalized_form must be a non-empty string"}}
         days = candidate.get("minimum_viable_days")
-        if isinstance(days, bool) or not isinstance(days, (int, float)) or not math.isfinite(days) or days <= 0:
+        try:
+            valid_days = not isinstance(days, bool) and isinstance(days, (int, float)) and math.isfinite(float(days)) and days > 0
+        except (OverflowError, TypeError, ValueError):
+            valid_days = False
+        if not valid_days:
             return {"ok": False, "error": {"code": "invalid_candidate", "message": "candidate minimum_viable_days must be positive and finite"}}
         for field in ("destination_potential", "this_trip_suitability", "better_window"):
             value = candidate.get(field)
@@ -138,12 +155,11 @@ def score_payload(payload):
             if not isinstance(status, str) or status not in EVIDENCE_STATUSES:
                 return {"ok": False, "error": {"code": "invalid_candidate", "message": "dimension evidence_status is invalid"}}
             value = record.get("score")
-            if value is not None and (
-                isinstance(value, bool)
-                or not isinstance(value, (int, float))
-                or not math.isfinite(value)
-                or not 0 <= value <= 5
-            ):
+            try:
+                valid_score = value is None or (not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(float(value)) and 0 <= value <= 5)
+            except (OverflowError, TypeError, ValueError):
+                valid_score = False
+            if not valid_score:
                 return {"ok": False, "error": {"code": "invalid_candidate", "message": "dimension score must be a finite number from 0 to 5"}}
     candidates = [score_candidate(candidate, weights) for candidate in raw_candidates]
     pending = []

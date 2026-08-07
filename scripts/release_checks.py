@@ -33,7 +33,7 @@ REQUIRED_RESOURCES = (
 
 LOCAL_PATH = re.compile(r"(?:/Users/|/home/)[A-Za-z0-9._-]+/|[A-Za-z]:\\+Users\\+[^\s]+", re.IGNORECASE)
 KEY_ASSIGNMENT = re.compile(
-    r"(?:api[_-]?key|secret|token|password)\s*[\"']?\s*[:=]\s*[\"']([A-Za-z0-9_-]{24,})[\"']",
+    r"(?:[A-Za-z0-9_-]*api[_-]?key|key|secret|token|password)\s*[\"']?\s*[:=]\s*[\"']?([A-Za-z0-9_+/=-]{24,})[\"']?",
     re.IGNORECASE,
 )
 MARKDOWN_LINK = re.compile(r"\[[^]]*\]\(([^)]+)\)")
@@ -206,18 +206,29 @@ def _without_markdown_code(text: str) -> str:
     return "".join(output)
 
 
-def tracked_files(root: Path) -> list[Path]:
-    result = subprocess.run(
-        ["git", "-C", str(root), "ls-files", "-z"],
-        check=True,
-        capture_output=True,
-    )
-    return [root / item.decode("utf-8") for item in result.stdout.split(b"\0") if item]
+def tracked_files(root: Path) -> tuple[list[Path], list[str]]:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-z"],
+            check=True,
+            capture_output=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return [], ["cannot enumerate tracked files"]
+    files = []
+    issues = []
+    for item in result.stdout.split(b"\0"):
+        if not item:
+            continue
+        try:
+            files.append(root / item.decode("utf-8"))
+        except UnicodeDecodeError:
+            issues.append("tracked file name is not valid UTF-8")
+    return files, issues
 
 
 def main() -> int:
-    files = tracked_files(ROOT)
-    issues = []
+    files, issues = tracked_files(ROOT)
     issues.extend(validate_skill_metadata(ROOT / "SKILL.md"))
     issues.extend(validate_openai_metadata(ROOT / "SKILL.md", ROOT / "agents/openai.yaml"))
     issues.extend(validate_required_resources(ROOT))

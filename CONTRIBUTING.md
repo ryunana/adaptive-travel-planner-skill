@@ -25,6 +25,9 @@ Useful contributions include:
 Before submitting:
 
 ```bash
+python3 -m pip install -r requirements-release.txt
+python3 -m unittest discover -s tests
+python3 scripts/release_checks.py
 git diff --check
 rg -n '/Users/|/home/|@|token|cookie|order|booking id|room number' .
 ```

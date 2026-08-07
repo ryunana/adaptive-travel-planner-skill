@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Validate itinerary dates, load, topology, and dynamic evidence."""
-from datetime import date
+from datetime import date, datetime
 
 from travel_common import JsonArgumentParser, TravelInputError, emit, read_json
 
@@ -42,10 +42,11 @@ def validate(payload):
         days = payload.get("days", [])
         if len(days) != expected_days:
             issues.append(issue("day_count_mismatch", "days must contain one entry for every calendar date", "days"))
-        expected_dates = [(start.fromordinal(start.toordinal() + offset)).isoformat() for offset in range(expected_days)]
-        actual_dates = [day.get("date") for day in days]
-        if len(days) == expected_days and actual_dates != expected_dates:
-            issues.append(issue("day_dates_mismatch", "day dates must be consecutive and match the trip range", "days"))
+        if len(days) == expected_days:
+            for offset, day in enumerate(days):
+                if day.get("date") != start.fromordinal(start.toordinal() + offset).isoformat():
+                    issues.append(issue("day_dates_mismatch", "day dates must be consecutive and match the trip range", "days"))
+                    break
     except (KeyError, TypeError, ValueError):
         issues.append(issue("date_format_invalid", "start_date and end_date must be ISO calendar dates"))
         days = payload.get("days", [])
@@ -79,14 +80,24 @@ def validate(payload):
         source = claim.get("source")
         queried_at = claim.get("queried_at")
         invalid_fields = False
-        if source is not None and (not isinstance(source, str) or not source.strip()):
+        if any(not isinstance(claim.get(field), str) or not claim[field].strip() for field in ("field", "valid_for")):
+            issues.append(issue("evidence_record_invalid", "dynamic claim field and valid_for must be non-empty strings", path))
+            invalid_fields = True
+        if (status in {"verified", "auxiliary"} and source is None) or (
+            source is not None and (not isinstance(source, str) or not source.strip())
+        ):
             issues.append(issue("evidence_source_invalid", "dynamic claim source must be a non-empty string", path))
             invalid_fields = True
-        if queried_at is not None and (not isinstance(queried_at, str) or not queried_at.strip()):
-            issues.append(issue("evidence_query_time_invalid", "dynamic claim query time must be a non-empty string", path))
+        try:
+            parsed_time = datetime.fromisoformat(queried_at.replace("Z", "+00:00")) if isinstance(queried_at, str) else None
+            valid_time = parsed_time is not None and parsed_time.tzinfo is not None and parsed_time.utcoffset() is not None
+        except ValueError:
+            valid_time = False
+        if not valid_time:
+            issues.append(issue("evidence_query_time_invalid", "dynamic claim query time must be a timezone-aware ISO-8601 timestamp", path))
             invalid_fields = True
         stated = claim.get("value") not in (None, "")
-        supported = status in {"verified", "auxiliary"} and source and queried_at and not invalid_fields
+        supported = status in {"verified", "auxiliary"} and isinstance(source, str) and source.strip() and valid_time and not invalid_fields
         if stated and not supported:
             issues.append(issue("unsupported_dynamic_claim", "a stated dynamic value requires verified/auxiliary evidence, source, and query time", path))
     return {"ok": not issues, "issue_count": len(issues), "issues": issues}

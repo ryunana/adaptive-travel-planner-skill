@@ -1,13 +1,15 @@
 # V2 Final Code Review
 
 Date: 2026-08-07
-Verdict: **CHANGES REQUIRED**
+Original verdict: **CHANGES REQUIRED**
+
+Current response status: **PENDING INDEPENDENT RE-REVIEW**
 
 This review uses only synthetic inputs and public repository contracts. It contains no private traveler data, credentials, internal task identifiers, model identifiers, or development-session paths.
 
 ## Verification Baseline
 
-The current branch passes 53 unit tests, the repository release checker, the 8/8 scenario harness, the 8/8 itinerary harness, and the GitHub Actions security audit. Those green checks do not cover the adversarial cases below; each finding was independently reproduced against the current tree.
+The original reviewed baseline passed 53 unit tests, the repository release checker, the 8/8 scenario harness, the 8/8 itinerary harness, and the GitHub Actions security audit. Those green checks did not cover the adversarial cases below; each finding was independently reproduced against that baseline.
 
 ## Findings
 
@@ -127,3 +129,23 @@ Local JSON and provider responses are read without a size limit. Bound input and
 | R12 | PyYAML `safe_load` validates mapping shapes for both metadata files; release dependency is pinned and installed in CI. | `test_yaml_metadata_rejects_malformed_and_wrong_shapes` | Fixed |
 | R13 | Reference definitions/usages, local files, and Markdown heading fragments are validated. | `test_markdown_reference_links_and_fragments_are_checked` | Fixed |
 | R14 | JSON/config reads are capped at 1 MiB and provider responses at 2 MiB, reading only one byte beyond each boundary. | `test_json_file_input_size_boundary`, `test_provider_response_size_boundary` | Fixed |
+
+## Re-review Findings R15–R27
+
+The implementation response below is not an approval; every item remains pending independent re-review.
+
+| ID | Resolution | Regression test | Status |
+|---|---|---|---|
+| R15 | Privacy scanning recognizes quoted/unquoted assignments and common Base64/URL-safe characters without printing values. | `test_privacy_scan_detects_quoted_and_unquoted_key_assignments` | Fixed; pending re-review |
+| R16 | Configuration validates documented boolean and non-empty-string field types while preserving extensions. | `test_configuration_semantic_types_fail_closed` | Fixed; pending re-review |
+| R17 | Dynamic evidence requires `field`, `valid_for`, and a timezone-aware ISO-8601 query time. | `test_dynamic_claim_requires_complete_freshness_record` | Fixed; pending re-review |
+| R18 | Provider success/error data cannot reflect the configured key; unknown provider codes are not echoed. | `test_provider_cannot_reflect_key_in_success_or_error` | Fixed; pending re-review |
+| R19 | Invalid UTF-8 tracked filenames produce a controlled release issue. | `test_tracked_files_reports_non_utf8_names_without_traceback` | Fixed; pending re-review |
+| R20 | Numeric validation safely rejects integers too large for finite float conversion. | `test_huge_integers_are_rejected_without_overflow` | Fixed; pending re-review |
+| R21 | Strict JSON rejects non-finite exponents/excessive nesting and strict output handles recursion failures. | strict/deep JSON regression tests | Fixed; pending re-review |
+| R22 | Input read failures return generic `input_unreadable` without exposing paths. | `test_unreadable_input_error_does_not_echo_path` | Fixed; pending re-review |
+| R23 | `--do-not-ask-again` performs no prompt and atomically changes only the onboarding preference. | `test_do_not_ask_again_only_persists_preference` | Fixed; pending re-review |
+| R24 | POSIX file-backed keys fail closed when group/other permission bits are present. | `test_group_readable_key_configuration_fails_closed` | Fixed; pending re-review |
+| R25 | A symlinked default parent does not cause setup to chmod its target directory. | `test_default_parent_symlink_target_mode_is_preserved` | Fixed; pending re-review |
+| R26 | Date validation checks day count before bounded date comparison and never allocates over the full span. | `test_wide_date_range_with_empty_days_returns_quickly` | Fixed; pending re-review |
+| R27 | Review status, contributor setup, fixtures, and reproducibility language are synchronized. | release/document checks | Fixed; pending re-review |

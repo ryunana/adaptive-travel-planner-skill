@@ -75,7 +75,7 @@ class AMapClient:
                 code = "quota_exceeded"
             else:
                 code = "provider_error"
-            return self._error(code, "AMap rejected the request", infocode=infocode)
+            return self._error(code, "AMap rejected the request")
         if path == "/v3/geocode/geo":
             geocodes = payload.get("geocodes")
             if not isinstance(geocodes, list) or any(not isinstance(item, dict) for item in geocodes):
@@ -90,7 +90,17 @@ class AMapClient:
             records = payload.get(field)
             if not isinstance(records, list) or any(not isinstance(item, dict) for item in records):
                 return self._error("malformed_response", "AMap weather response has an invalid shape")
-        return {"ok": True, "provider": "amap", "data": payload}
+        return {"ok": True, "provider": "amap", "data": self._redact(payload)}
+
+    def _redact(self, value):
+        """Remove reflected configured-key substrings from bounded provider JSON."""
+        if isinstance(value, str):
+            return value.replace(self.api_key, "[REDACTED]")
+        if isinstance(value, list):
+            return [self._redact(item) for item in value]
+        if isinstance(value, dict):
+            return {self._redact(key) if isinstance(key, str) else key: self._redact(item) for key, item in value.items()}
+        return value
 
     @staticmethod
     def _error(code, message, **details):

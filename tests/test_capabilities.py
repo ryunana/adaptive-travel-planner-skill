@@ -1,5 +1,6 @@
 import json
 import os
+import stat
 import sys
 import tempfile
 import unittest
@@ -32,6 +33,7 @@ class CapabilityTests(unittest.TestCase):
     def test_file_configuration_is_configured_unverified(self):
         import check_capabilities
         self.config.write_text(json.dumps({"amap": {"enabled": True, "api_key": "fixture-secret"}}))
+        self.config.chmod(0o600)
         result = check_capabilities.detect(config_path=self.config)
         self.assertEqual(result["amap"]["state"], "configured_but_unverified")
         self.assertEqual(result["amap"]["key_source"], "file")
@@ -61,6 +63,28 @@ class CapabilityTests(unittest.TestCase):
                 result = check_capabilities.detect(config_path=self.config)
                 self.assertFalse(result["ok"])
                 self.assertEqual(result["error"]["code"], "configuration_invalid")
+
+    def test_configuration_semantic_types_fail_closed(self):
+        import check_capabilities
+        cases = (
+            {"amap": {"enabled": "false", "api_key": "fixture-secret"}},
+            {"amap": {"enabled": 1, "api_key": "fixture-secret"}},
+            {"onboarding": {"offer_amap_setup": "false"}},
+        )
+        for value in cases:
+            with self.subTest(value=value):
+                self.config.write_text(json.dumps(value))
+                result = check_capabilities.detect(config_path=self.config)
+                self.assertEqual(result["error"]["code"], "configuration_invalid")
+
+    @unittest.skipUnless(os.name == "posix", "POSIX permissions required")
+    def test_group_readable_key_configuration_fails_closed(self):
+        import check_capabilities
+        self.config.write_text(json.dumps({"amap": {"enabled": True, "api_key": "fixture-secret"}}))
+        self.config.chmod(0o644)
+        result = check_capabilities.detect(config_path=self.config)
+        self.assertEqual(stat.S_IMODE(self.config.stat().st_mode), 0o644)
+        self.assertEqual(result["error"]["code"], "configuration_invalid")
 
 
 if __name__ == "__main__":

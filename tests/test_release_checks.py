@@ -2,6 +2,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
@@ -89,6 +90,20 @@ class ReleaseChecksTests(unittest.TestCase):
                 encoding="utf-8",
             )
             self.assertEqual(release_checks.scan_privacy(root, [safe]), [])
+
+    def test_privacy_scan_detects_quoted_and_unquoted_key_assignments(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            unsafe = root / "unsafe.env"
+            unsafe.write_text(
+                "AMAP_API_KEY=" + ("a" * 32) + "\n"
+                "key: " + ("B" * 24) + "_-+/=\n"
+                "token = '" + ("c" * 32) + "'\n",
+                encoding="utf-8",
+            )
+            issues = release_checks.scan_privacy(root, [unsafe])
+            self.assertEqual(len(issues), 3)
+            self.assertTrue(all("key-like assigned value" in item for item in issues))
 
     def test_privacy_scan_fails_closed_on_mixed_encoding_key_canary(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -182,6 +197,13 @@ class ReleaseChecksTests(unittest.TestCase):
 
     def test_required_release_resources_exist_in_repository(self):
         self.assertEqual(release_checks.validate_required_resources(ROOT), [])
+
+    def test_tracked_files_reports_non_utf8_names_without_traceback(self):
+        completed = mock.Mock(stdout=b"valid.md\0bad-\xff.md\0")
+        with mock.patch("release_checks.subprocess.run", return_value=completed):
+            files, issues = release_checks.tracked_files(ROOT)
+        self.assertEqual(files, [ROOT / "valid.md"])
+        self.assertEqual(issues, ["tracked file name is not valid UTF-8"])
 
 
 if __name__ == "__main__":

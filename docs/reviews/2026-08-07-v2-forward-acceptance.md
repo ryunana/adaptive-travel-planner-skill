@@ -21,7 +21,7 @@
 | 7 | 高长期潜力、低本次适配 | PASS | 虚构多区域长线保留高长期潜力；4 天且拒绝裁剪触发 duration hard-gate fail，不进入评分 |
 | 8 | 混合粒度 + 有限天数 | PASS | 原标签、规范化形态、`minimum_viable_days` 同时展示；实质裁剪需用户接受 |
 
-自动契约检查结果：`scenario_contract_pass=8/8`；确定性行程检查结果：`itinerary_validation_pass=8/8`、每份 `issue_count=0`。临时输入与完整虚构响应保存在 `/tmp/adaptive-travel-planner-v2-acceptance/`，未进入仓库。
+评审时的临时 harness 结果为 `scenario_contract_pass=8/8` 与 `itinerary_validation_pass=8/8`。该 `/tmp` harness 未纳入仓库，因此仅作为评审证据，不冒充公开可复跑命令；仓库内可复跑门禁见第 6 节。
 
 ## 2. 全新用户安装走查
 
@@ -64,7 +64,7 @@ capability.amap.state=installed_but_unconfigured
 
 所有场景均使用明确标注的虚构用户、偏好、候选和事件。每个场景响应均包含一句话条件排序、动态字段状态、逐日 rank-1 行程、rank-2 简版路线与切换条件、延期理由、固定 `pending_gates` 和恰好一个聚焦问题。
 
-实际检查命令：
+评审时临时检查记录（该脚本未跟踪，不是仓库公开可复跑命令）：
 
 ```text
 $ python3 /tmp/adaptive-travel-planner-v2-acceptance/check_scenarios.py
@@ -149,6 +149,7 @@ key_source=environment
 | B15 | High / Configuration safety | fixed | 损坏配置可被覆盖，任意已有父目录权限可被改变 | 损坏配置独立状态并逐字节保留；只保护默认或新建目录权限 |
 | B16 | High / Provider validation | fixed | AMap 成功状态缺少端点结构、畸形本地参数仍可进入网络 | geocode/route/weather 分别验证容器与记录；地址、坐标、adcode 在网络前验证 |
 | B17 | High / Release integrity | fixed | 非 UTF-8 文件 fail-open、非法 YAML 与 reference/fragment 链接漏检 | 混合编码 fail-closed；PyYAML safe_load；完整本地链接与 heading 检查 |
+| B18 | High / Adversarial boundaries | fixed; pending re-review | 无引号 Key、配置语义类型、证据完整性、provider Key 反射、超大数值/深度、私有路径错误、零配置偏好、配置权限与超宽日期跨度 | 新增逐项回归；严格 JSON 与通用错误保持无 traceback/无敏感值 |
 | I1 | Info / Release state | untestable | README 公网 clone 目前只能得到 main，不含 V2 | 发布后按同一走查重测 |
 
 ## 6. 已决策评分语义
@@ -190,7 +191,7 @@ level = high when value >= 0.8, medium when value >= 0.5, otherwise low
 
 ```text
 $ python3 -m unittest discover -s tests
-Ran 72 tests
+Ran 88 tests
 OK
 
 $ python3 scripts/release_checks.py

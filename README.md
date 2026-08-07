@@ -163,6 +163,12 @@ python3 scripts/setup_amap.py
 python3 scripts/verify_amap.py
 ```
 
+若选择继续使用零配置模式且以后不再提示，只持久化该偏好（不会询问或修改 Key）：
+
+```bash
+python3 scripts/setup_amap.py --do-not-ask-again
+```
+
 设置脚本使用隐藏输入，不接受命令行参数中的 Key；配置保存在 `~/.config/adaptive-travel-planner/config.json`，并以仅当前用户可读写的权限原子写入。不要把 Key 粘贴到聊天、Issue、日志或仓库文件中。CI 等高级场景可以临时使用 `AMAP_API_KEY` 环境变量覆盖本地配置。安装文件存在不代表能力可用，只有地址解析、路线和基础天气三步真实验证通过后，才应标记为 `verified_working`。
 
 ## 标准输出应该包含什么

@@ -47,6 +47,23 @@ class AMapClientTests(unittest.TestCase):
         self.assertEqual(result["error"]["code"], "invalid_key")
         self.assertNotIn(SECRET, json.dumps(result))
 
+    def test_provider_cannot_reflect_key_in_success_or_error(self):
+        import amap_cli
+        success = json.dumps({"status": "1", "geocodes": [{"location": SECRET, SECRET: "x"}]}).encode()
+        result = amap_cli.AMapClient(SECRET, opener=lambda request, timeout: Response(success)).geocode("x")
+        self.assertTrue(result["ok"])
+        self.assertNotIn(SECRET, json.dumps(result))
+        failure = json.dumps({"status": "0", "infocode": SECRET, "info": SECRET}).encode()
+        result = amap_cli.AMapClient(SECRET, opener=lambda request, timeout: Response(failure)).geocode("x")
+        self.assertFalse(result["ok"])
+        self.assertNotIn(SECRET, json.dumps(result))
+
+    def test_provider_rejects_nonfinite_exponent_and_excessive_depth(self):
+        import amap_cli
+        for raw in (b'{"status":"1","geocodes":[{"x":1e9999}]}', b"[" * 2000 + b"]" * 2000):
+            result = amap_cli.AMapClient(SECRET, opener=lambda request, timeout, raw=raw: Response(raw)).geocode("x")
+            self.assertEqual(result["error"]["code"], "malformed_response")
+
     def test_quota_is_structured(self):
         result = self.client("amap_quota.json").weather("110000")
         self.assertEqual(result["error"]["code"], "quota_exceeded")

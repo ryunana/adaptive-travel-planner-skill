@@ -74,6 +74,29 @@ class ScoreTests(unittest.TestCase):
                 self.assertFalse(result["ok"])
                 self.assertEqual(result["error"]["code"], "invalid_weights")
 
+    def test_huge_integers_are_rejected_without_overflow(self):
+        import score_destinations
+        huge = 10 ** 400
+        weights = dict(score_destinations.DEFAULT_WEIGHTS, preference_fit=huge)
+        self.assertEqual(score_destinations.score_payload({"weights": weights, "candidates": [candidate("A")]})["error"]["code"], "invalid_weights")
+        item = candidate("A")
+        item["minimum_viable_days"] = huge
+        self.assertEqual(score_destinations.score_payload({"candidates": [item]})["error"]["code"], "invalid_candidate")
+        item = candidate("A")
+        item["dimensions"]["preference_fit"]["score"] = huge
+        self.assertEqual(score_destinations.score_payload({"candidates": [item]})["error"]["code"], "invalid_candidate")
+
+    def test_deep_pending_gate_is_rejected_before_copying(self):
+        import score_destinations
+        deep = value = {}
+        for _ in range(300):
+            value["child"] = {}
+            value = value["child"]
+        gate = {"name": "inventory", "state": "undecidable", "evidence_status": "unknown", "resolution_action": "check", "extra": deep}
+        result = score_destinations.score_payload({"candidates": [candidate("A", gates=[gate])]})
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error"]["code"], "invalid_candidate")
+
     def test_candidate_shapes_are_validated_before_scoring(self):
         import score_destinations
         cases = []
