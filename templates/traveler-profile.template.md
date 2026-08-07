@@ -15,7 +15,7 @@
 - Acceptable cancellation or switching cost: [optional]
 - Destination-potential versus current-trip priority: [optional]
 - Preferred evidence-confidence threshold for commitment: [optional]
-- AMap setup preference: [offer / zero-configuration / do not ask again / unknown]
+- AMap setup preference: [offer / continue without AMap in the current mode / do not ask again / unknown]
 
 ## Party and Luggage
 

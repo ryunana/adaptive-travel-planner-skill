@@ -52,6 +52,21 @@ For destination selection, load detailed references only when their step begins:
 
 Do not preload source, adapter, or scoring detail for an itinerary-only request. The destination-selection route must normalize each candidate, apply three-state hard gates before scores, screen every candidate, deep-research only the leaders, and keep unresolved gates explicit.
 
+## Runtime Capability Gate
+
+Full dynamic planning requires at least one working host capability that can search the current web or inspect current first-party pages. Installing this Skill does not install or configure a search backend. Before relying on live evidence, confirm that the host can complete one current query.
+
+For mainland China dynamic facts:
+
+1. Open a known official URL directly when one is available.
+2. If the host exposes a verified Chinese web-search provider, such as Doubao Search Custom or a `doubao-search` skill, prefer it for discovering official notices, domestic transport changes, policies, prices, and recent Chinese sources.
+3. Otherwise use the host's default web search or interactive browser. Doubao is recommended, not mandatory.
+4. Use AMap for geography, POI, and driving evidence; it is not a substitute for general web search.
+
+Search results are discovery evidence, not automatic proof. Open the original source, preserve its published precision, and follow `references/source-policy-cn.md`.
+
+If neither web search nor an interactive browser works, enter limited mode: use current evidence supplied by the user, keep unsupported dynamic facts `unknown` or `login_required`, and do not describe the result as a fully verified current itinerary. Never request provider keys in chat or copy host credentials into this repository.
+
 ## Current-State Gate
 
 Before planning, establish:

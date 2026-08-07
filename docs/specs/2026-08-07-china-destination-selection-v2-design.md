@@ -21,7 +21,7 @@ V2 must support vague candidate-level requests without immediately generating se
 - Candidate destination comparison and elimination.
 - Low-cost generation of two to four candidates when the user has none, using the stable traveler profile and seasonal knowledge before live-query budget is spent.
 - Exact-date transport, weather, attraction, hotel, crowd, and route research when tools permit.
-- Zero-configuration browser/search mode.
+- Host-provided browser/search mode, with at least one successful current query required for full dynamic planning.
 - Optional enhanced AMap mode using an official Web Service API key.
 - Private traveler profile, composite-load rules, explicit go/conditional/defer/cancel decisions, and post-trip calibration.
 - A complete itinerary for the first-ranked option and a concise switchable route for the second-ranked option.
@@ -83,15 +83,16 @@ Detect and report:
 - AMap enhanced adapter installation;
 - AMap key configuration and verified query status.
 
+Full dynamic planning requires a working host web-search or interactive-browser capability. If neither can complete a current query, continue only in limited mode: normalize candidates, apply stable profile preferences, analyze composite load, review itinerary structure, and use current evidence supplied by the user. Unsupported dynamic facts remain `unknown` or `login_required`, and the result must not be described as a fully verified current itinerary.
+
 If AMap enhanced mode is unavailable, explain precisely what improves with it: geocoding, driving routes, distance, duration, toll reference, and short-horizon city-level baseline weather. State that rail inventory, flights, hotels, attraction tickets, microclimate, and crowd conditions still need other sources. Also state that AMap does not extend the 8-14 day weather decision horizon beyond the normal forecast sources, so enhanced mode has no promised weather-coverage gain for that window. Exact forecast horizon and quota statements must come from the official documentation rechecked during implementation.
 
-Offer:
+When optional AMap enhancement is unavailable, offer one mode-appropriate set:
 
-1. Install and continue.
-2. Continue in zero-configuration mode.
-3. Continue and do not ask again.
+- With verified live discovery: (1) set up AMap and continue in host search mode, (2) continue in host search mode without AMap, or (3) continue without AMap and do not ask again.
+- Without verified live discovery: (1) set up AMap as a narrow map enhancement while remaining in limited mode, (2) continue in limited mode without AMap, or (3) continue in limited mode without AMap and do not ask again.
 
-Persist only the third preference locally.
+Persist only the third preference in the selected set. AMap success or failure never changes discovery mode by itself.
 
 ### Stage C: Optional AMap setup
 
@@ -308,7 +309,7 @@ Scripts should use the Python standard library where practical and support a bro
 Update README with:
 
 - the vague-candidates use case;
-- zero-configuration versus enhanced mode;
+- host search and limited modes versus enhanced AMap;
 - what enhanced AMap does and does not improve;
 - safe key setup;
 - destination comparison and output examples.
@@ -317,13 +318,14 @@ Update README with:
 
 | Failure | Required behavior |
 |---|---|
-| No AMap key | Explain impact, offer setup, then use browser mode if declined |
+| No AMap key | Explain impact, offer setup, then preserve the current discovery mode if declined: use host search mode only when live discovery is verified; otherwise remain in limited mode |
+| No working web search or interactive browser | Enter limited mode; keep unsupported dynamic facts unknown or login-required and do not claim a fully verified current itinerary |
 | Invalid or quota-limited key | Mark enhanced capability failed; never expose key |
 | 12306 or hotel login required | Mark field login-required and ask for authenticated check or screenshot |
 | One provider disagrees with another | Prefer first-party evidence and explain discrepancy |
 | Weather outside reliable horizon | Use climate/seasonal risk and lower confidence |
 | Candidate has insufficient evidence | Do not fabricate score; report uncertainty and missing decision-critical facts |
-| Install succeeds but live test fails | Report setup incomplete and stay in zero-configuration mode |
+| AMap install succeeds but its live test fails | Report setup incomplete and stay in host search mode when live discovery still works; otherwise enter limited mode |
 | Entire city loses primary value | Compare another city, not only weak local substitutes |
 
 ## 10. Validation

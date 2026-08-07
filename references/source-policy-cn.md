@@ -2,6 +2,20 @@
 
 Load this reference when researching dynamic facts for mainland China destinations. A provider's presence is not proof of current access, and supporting evidence must not silently become authoritative evidence.
 
+## Provider Routing
+
+Full dynamic planning requires a working host web-search or interactive-browser capability. Installing this repository does not install one.
+
+Route discovery as follows:
+
+1. When a current official URL is already known, open that page directly.
+2. For mainland China notices, policies, transport changes, prices, and recent Chinese sources, prefer a host-provided Chinese search provider such as Doubao Search Custom when it has completed a successful live query.
+3. If that provider is unavailable, use the host's default web search or interactive browser. Doubao is recommended, not mandatory.
+4. Use AMap for map, POI, geocoding, and driving evidence, not as a replacement for general web search.
+5. If no live discovery capability works, enter limited mode and keep every unsupported dynamic claim `unknown` or `login_required`.
+
+A provider's authority label is only a ranking hint. Open the original result and classify the underlying first-party or supporting source using the policy below. Keep provider credentials and setup at the host layer; never ask the user to paste a key into chat or store it in this repository.
+
 ## Source Priority
 
 | Domain | Primary evidence | Supporting evidence |

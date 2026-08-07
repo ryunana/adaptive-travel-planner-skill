@@ -7,6 +7,7 @@ Load this reference only when detecting, explaining, configuring, or choosing da
 | Adapter | Useful capabilities | Forecast horizon | Authentication prerequisite | Quota and access boundary |
 |---|---|---|---|---|
 | Web search | Discover official pages, warnings, schedules, policies, and recent supporting evidence | Depends on the discovered source; search itself provides no forecast | Usually none; some results lead to gated pages | Result coverage and freshness vary; no guaranteed inventory access |
+| Host-provided Chinese web search, for example Doubao Search Custom | Discover mainland China official notices, domestic transport changes, prices, policies, and recent Chinese supporting evidence | Depends on the original source; search itself provides no forecast | Separate host-level registration and provider credential; this repository does not install or store it | Quota, pricing, ranking, freshness, and coverage can change; provider authority labels are hints, not proof |
 | Interactive browser | Inspect current first-party pages and user-visible inventory; support user-authenticated checks | Depends on the page and source | May require user login, consent, CAPTCHA, or app-only action | Session, anti-automation, and page-access limits apply; never claim access before a successful check |
 | Python runtime | Run deterministic local validation, scoring, capability checks, and repository adapters | None by itself | Local executable only | No external data or provider entitlement by itself |
 | Repository AMap Web Service adapter | Official geocoding, driving routes, distance, duration, toll reference, and city-level baseline weather | Short-horizon baseline only; it does not extend the 8-14 day decision horizon | AMap developer verification where required plus an authorized Web Service key | Endpoint availability, key type, numeric quotas, rate behavior, and terms must be reverified against current official documentation during implementation |
@@ -16,6 +17,14 @@ Load this reference only when detecting, explaining, configuring, or choosing da
 | Domestic booking platforms | Auxiliary rail/flight evidence and current hotel marketplace inventory | Any weather display remains auxiliary unless sourced authoritatively | Login may be required for full inventory or prices | Marketplace inventory and prices drift; record market, date, and query time |
 | Attraction official channels | Opening, closure, reservation, refund, and ticket rules | Attraction-specific notices, not a general forecast | Official account, mini-program, or login may be required | App-only or login-gated facts remain `login_required` until confirmed |
 | Meteorological/government sources | Warnings, observations, forecasts, and seasonal risk evidence | Use only the horizon and granularity the source currently publishes | Usually none; varies by source | City forecasts do not establish scenic-area microclimate; preserve published precision |
+
+## Full and Limited Modes
+
+Full dynamic planning requires at least one successful current query through web search or an interactive browser. Any provider is acceptable if it can return inspectable source URLs; Doubao Search Custom is recommended for mainland China discovery but is not mandatory.
+
+Without a working discovery capability, the Skill remains useful for candidate normalization, preference fit, composite-load analysis, and structural itinerary review. It must treat unsupported weather, opening status, schedules, prices, inventory, and crowd claims as `unknown` or `login_required` and must not describe the output as a fully verified current itinerary.
+
+AMap alone does not satisfy the general web-search requirement because it cannot establish rail inventory, flights, hotel prices, attraction ticket stock, scenic-area microclimate, or current crowd conditions.
 
 ## Enhanced AMap Claims
 
@@ -46,4 +55,4 @@ Report each adapter as one of:
 - verified working;
 - failed, with the exact failed stage.
 
-When an enhanced adapter is unavailable or failed, continue in zero-configuration mode unless it blocks a user-required fact. Do not lower evidence standards merely because a preferred adapter is absent.
+When an enhanced adapter is unavailable or failed, continue in host search mode if a working web-search or interactive-browser capability remains. Otherwise enter limited mode. Do not lower evidence standards merely because a preferred adapter is absent.
