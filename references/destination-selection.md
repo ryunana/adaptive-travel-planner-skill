@@ -36,6 +36,8 @@ Detect and report web search, interactive browser and likely login needs, Python
 
 If neither live discovery capability works, enter limited mode. Continue only with candidate normalization, stable profile fit, composite-load analysis, structural review, and current evidence supplied by the user. Keep unsupported dynamic facts `unknown` or `login_required`; do not present the result as a fully verified current itinerary. Missing web search and missing AMap are different conditions.
 
+One failed provider test does not establish that live discovery is unavailable. Follow `research-effort-contract.md`: try another available provider or interactive browser before declaring the discovery capability unavailable. AMap may verify only its map-specific fields; an authenticated session may be conditionally required for inventory.
+
 If enhanced AMap mode is unavailable, describe its narrow benefit: geocoding, driving route, distance, duration, toll reference, and short-horizon city-level baseline weather. It does not provide rail or flight inventory, hotel prices, attraction ticket stock, scenic-area microclimate, or crowd conditions, and it does not extend the 8-14 day weather decision horizon.
 
 When optional AMap enhancement is unavailable, offer exactly one mode-appropriate choice set:
@@ -92,6 +94,8 @@ For the top two provisional candidates, verify as available:
 - route topology and internal travel burden;
 - composite physical and driving load;
 - cancellation deadlines and switching cost.
+
+Apply the full bounded protocol in `research-effort-contract.md` to every unresolved decision-critical dynamic fact for the top two candidates and the executable rank-1 itinerary. A current authoritative result may stop immediately; otherwise use the required query reformulation, source ladder, available-channel fallback, attempt log, and stopping condition before `unknown`. Use the lighter supporting-fact budget for details that cannot change ranking, a hard gate, or execution.
 
 Represent dynamic facts using the evidence record in `source-policy-cn.md`. Never fabricate a score when decision-critical evidence is insufficient.
 

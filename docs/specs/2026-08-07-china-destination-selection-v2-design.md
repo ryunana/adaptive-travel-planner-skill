@@ -157,6 +157,8 @@ For the top two candidates, verify as available:
 - composite physical and driving load;
 - cancellation deadlines and switching cost.
 
+Decision-critical dynamic facts for these leaders follow `references/research-effort-contract.md`. A current authoritative result may stop immediately. Before `unknown`, unresolved facts require the bounded minimum of materially different queries, official/first-party and domain-appropriate alternative sources, another available provider or interactive browser after channel failure, an attempt log, and an explicit stopping condition. Supporting details that cannot change the decision use the lighter budget defined there.
+
 ### Stage F: Decide and plan
 
 Output:
@@ -204,6 +206,8 @@ Every dynamic fact should map to:
   "source_url": null,
   "queried_at": "ISO-8601 timestamp",
   "valid_for": "exact travel date",
+  "attempt_log": [],
+  "exhaustion_reason": null,
   "notes": "User must confirm in authenticated app"
 }
 ```
@@ -212,7 +216,7 @@ Allowed statuses:
 
 - `verified`: direct official or first-party current evidence;
 - `auxiliary`: credible but not authoritative experience or marketplace evidence;
-- `unknown`: query failed or no reliable source;
+- `unknown`: the bounded protocol reached an allowed stopping condition without reliable evidence;
 - `login_required`: the next check requires the user's authenticated session.
 
 ## 6. Forecast Horizon Rules
@@ -322,6 +326,7 @@ Update README with:
 | No working web search or interactive browser | Enter limited mode; keep unsupported dynamic facts unknown or login-required and do not claim a fully verified current itinerary |
 | Invalid or quota-limited key | Mark enhanced capability failed; never expose key |
 | 12306 or hotel login required | Mark field login-required and ask for authenticated check or screenshot |
+| One search provider or query fails | Follow the available provider/browser fallback and query-reformulation rules in `references/research-effort-contract.md`; do not assign unknown after one failure |
 | One provider disagrees with another | Prefer first-party evidence and explain discrepancy |
 | Weather outside reliable horizon | Use climate/seasonal risk and lower confidence |
 | Candidate has insufficient evidence | Do not fabricate score; report uncertainty and missing decision-critical facts |
@@ -356,8 +361,12 @@ Update README with:
 6. Rank 1 becomes invalid within 72 hours and the plan switches to rank 2.
 7. A famous destination scores high in potential but low for the current trip.
 8. Mixed-granularity candidates (regional circuit versus single city) with limited days; output must show each normalized candidate form and its minimum viable days before ranking.
+9. Official source lookup fails, a reformulated query finds current official evidence, and the fact becomes verified rather than unknown.
+10. Web search fails, an interactive browser opens the current official page, and the fact becomes verified.
+11. Exact inventory is behind a confirmed authentication boundary and becomes login-required with an exact user action.
+12. Official and alternative sources plus available channels are reasonably exhausted and the fact becomes unknown with an attempt summary and stopping reason.
 
-Acceptance requires a ranked destination decision, evidence statuses, one full itinerary, one concise fallback route, explicit deferred reasons, and no fabricated dynamic facts.
+Acceptance requires a ranked destination decision, evidence statuses, one full itinerary, one concise fallback route, explicit deferred reasons, no fabricated dynamic facts, and no decision-critical `unknown` produced after only one failed query.
 
 ## 11. Release Plan
 

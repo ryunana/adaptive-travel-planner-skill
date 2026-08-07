@@ -73,8 +73,9 @@ Do not hide an additional core activity under "optional evening activity."
 - Official closure, safety, and ticket rules outrank social posts.
 - Recent social evidence may identify queues, parking, misleading packaging, and current friction.
 - Recheck when the user's current app screenshot conflicts with search results.
-- Label failed checks unknown. Never interpolate schedules, inventory, opening status, or prices.
-- Record dynamic claims with field, value, evidence status, source, source URL when available, query time, validity scope, and notes as defined in `source-policy-cn.md`.
+- For every decision-critical dynamic fact, follow `research-effort-contract.md`; one failed query cannot become `unknown`.
+- Assign `unknown` only after the bounded multi-query, multi-source, and available-channel protocol reaches an allowed stopping condition. Use `login_required` at a confirmed authentication boundary. Never interpolate schedules, inventory, opening status, or prices.
+- Record dynamic claims with field, value, evidence status, source, source URL when available, query time, validity scope, `attempt_log`, exhaustion reason, and notes as defined in `source-policy-cn.md`.
 - Use only `verified`, `auxiliary`, `unknown`, or `login_required` evidence statuses.
 - Match weather claims to the forecast horizon: climate and seasonal hazards beyond 14 days, low-confidence trends at 8-14 days, daily forecasts at 3-7 days, hourly and attraction-specific checks within 72 hours, and observations/nowcast/closures on the same day.
 

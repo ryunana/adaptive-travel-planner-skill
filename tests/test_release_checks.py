@@ -10,6 +10,48 @@ sys.path.insert(0, str(SCRIPTS))
 
 import release_checks
 
+RESEARCH_CONTRACT_REFERENCES = (
+    "SKILL.md",
+    "README.md",
+    "references/source-policy-cn.md",
+    "references/planning-contract.md",
+    "references/destination-selection.md",
+    "references/capability-matrix.md",
+    "templates/portable-prompt.template.md",
+    "docs/specs/2026-08-07-china-destination-selection-v2-design.md",
+)
+
+VALID_RESEARCH_CONTRACT = """# Bounded Research Effort Contract
+
+For each decision-critical dynamic fact, do not assign `unknown` after one failed query.
+Before `unknown`, make at least three substantive attempts, use two materially different
+query formulations, attempt an official or first-party source and a domain-appropriate
+alternative source, and try another available discovery channel such as an interactive
+browser. Use `login_required` at an authentication boundary. Record every attempt in an
+`attempt_log`. Stop after two consecutive attempts produce no new credible lead once the
+minimum coverage is complete. One blocked path is not an early stop while another safe
+channel remains. After six substantive attempts, a new high-value lead may justify one
+final additional path.
+"""
+
+
+def write_research_contract_fixture(root: Path, *, contract: str = VALID_RESEARCH_CONTRACT) -> None:
+    for relative in RESEARCH_CONTRACT_REFERENCES:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("Follow `references/research-effort-contract.md`.\n", encoding="utf-8")
+    (root / "README.md").write_text(
+        "Follow `references/research-effort-contract.md`; 最多再跟进一条最终路径。\n",
+        encoding="utf-8",
+    )
+    (root / "templates/portable-prompt.template.md").write_text(
+        "Follow `references/research-effort-contract.md`; allow one final additional path.\n",
+        encoding="utf-8",
+    )
+    contract_path = root / "references/research-effort-contract.md"
+    contract_path.parent.mkdir(parents=True, exist_ok=True)
+    contract_path.write_text(contract, encoding="utf-8")
+
 
 class ReleaseChecksTests(unittest.TestCase):
     def test_yaml_metadata_rejects_malformed_and_wrong_shapes(self):
@@ -197,6 +239,125 @@ class ReleaseChecksTests(unittest.TestCase):
 
     def test_required_release_resources_exist_in_repository(self):
         self.assertEqual(release_checks.validate_required_resources(ROOT), [])
+
+    def test_research_effort_contract_requires_canonical_resource(self):
+        with tempfile.TemporaryDirectory() as directory:
+            issues = release_checks.validate_research_effort_contract(Path(directory))
+        self.assertIn(
+            "required research effort resource missing: references/research-effort-contract.md",
+            issues,
+        )
+
+    def test_research_effort_contract_requires_bounded_exhaustion_markers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_research_contract_fixture(
+                root,
+                contract="# Research\nTry an official source, then mark the fact unknown.\n",
+            )
+            issues = release_checks.validate_research_effort_contract(root)
+        self.assertTrue(any("minimum three substantive attempts" in issue for issue in issues))
+        self.assertTrue(any("two materially different query formulations" in issue for issue in issues))
+        self.assertTrue(any("domain-appropriate alternative source" in issue for issue in issues))
+        self.assertTrue(any("available discovery channel fallback" in issue for issue in issues))
+        self.assertTrue(any("attempt log" in issue for issue in issues))
+        self.assertTrue(any("bounded stopping conditions" in issue for issue in issues))
+        self.assertTrue(any("single blocked path fallback" in issue for issue in issues))
+        self.assertTrue(any("one final additional path" in issue for issue in issues))
+
+    def test_research_effort_contract_rejects_one_query_unknown_shortcut(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_research_contract_fixture(root)
+            portable = root / "templates/portable-prompt.template.md"
+            portable.write_text(
+                "Follow `references/research-effort-contract.md`.\n"
+                "If a query fails, label the fact unknown.\n",
+                encoding="utf-8",
+            )
+            issues = release_checks.validate_research_effort_contract(root)
+        self.assertIn(
+            "templates/portable-prompt.template.md permits unknown after one failed query",
+            issues,
+        )
+
+    def test_research_effort_contract_rejects_prior_report_unknown_shortcut(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_research_contract_fixture(root)
+            target = root / "SKILL.md"
+            target.write_text(
+                target.read_text()
+                + "\nIf a query fails, report unknown instead of estimating.\n",
+                encoding="utf-8",
+            )
+            issues = release_checks.validate_research_effort_contract(root)
+        self.assertIn(
+            "SKILL.md permits unknown after one failed query",
+            issues,
+        )
+
+    def test_research_effort_contract_rejects_single_blocked_path_early_stop(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_research_contract_fixture(root)
+            contract = root / "references/research-effort-contract.md"
+            contract.write_text(
+                contract.read_text()
+                + "\nStop research when further access would require bypassing a CAPTCHA.\n",
+                encoding="utf-8",
+            )
+            issues = release_checks.validate_research_effort_contract(root)
+        self.assertIn(
+            "references/research-effort-contract.md permits one blocked path to stop research",
+            issues,
+        )
+
+    def test_research_effort_contract_rejects_unbounded_english_lead_exception(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_research_contract_fixture(root)
+            portable = root / "templates/portable-prompt.template.md"
+            portable.write_text(
+                "Follow `references/research-effort-contract.md`.\n"
+                "Stop after six substantive attempts unless a new high-value lead appears.\n",
+                encoding="utf-8",
+            )
+            issues = release_checks.validate_research_effort_contract(root)
+        self.assertIn(
+            "templates/portable-prompt.template.md has an unbounded high-value-lead exception",
+            issues,
+        )
+
+    def test_research_effort_contract_rejects_unbounded_chinese_lead_exception(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_research_contract_fixture(root)
+            readme = root / "README.md"
+            readme.write_text(
+                "Follow `references/research-effort-contract.md`.\n"
+                "完成六次实质尝试且没有新的高价值线索，即可停止。\n",
+                encoding="utf-8",
+            )
+            issues = release_checks.validate_research_effort_contract(root)
+        self.assertIn(
+            "README.md has an unbounded high-value-lead exception",
+            issues,
+        )
+
+    def test_research_effort_contract_requires_active_resource_references(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_research_contract_fixture(root)
+            (root / "SKILL.md").write_text("# Skill\n", encoding="utf-8")
+            issues = release_checks.validate_research_effort_contract(root)
+        self.assertIn(
+            "SKILL.md must reference references/research-effort-contract.md",
+            issues,
+        )
+
+    def test_current_repository_satisfies_research_effort_contract(self):
+        self.assertEqual(release_checks.validate_research_effort_contract(ROOT), [])
 
     def test_tracked_files_reports_non_utf8_names_without_traceback(self):
         completed = mock.Mock(stdout=b"valid.md\0bad-\xff.md\0")

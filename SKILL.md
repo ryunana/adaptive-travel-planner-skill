@@ -46,7 +46,8 @@ First identify the route:
 
 For destination selection, load detailed references only when their step begins:
 
-- research or evidence classification: `references/source-policy-cn.md`;
+- research effort: `references/research-effort-contract.md`;
+- evidence classification: `references/source-policy-cn.md`;
 - capability detection, AMap explanation, or setup: `references/capability-matrix.md`;
 - hard-gate evaluation, ranking, or confidence: `references/scoring-model.md`.
 
@@ -64,6 +65,8 @@ For mainland China dynamic facts:
 4. Use AMap for geography, POI, and driving evidence; it is not a substitute for general web search.
 
 Search results are discovery evidence, not automatic proof. Open the original source, preserve its published precision, and follow `references/source-policy-cn.md`.
+
+For every decision-critical dynamic fact, follow `references/research-effort-contract.md`. Do not assign `unknown` after one failed query. Before `unknown`, make the required bounded multi-query, multi-source, and available-channel attempts, record the attempt log and stopping reason, and use `login_required` when the remaining check is behind a confirmed authentication boundary. A clear current authoritative result may stop the search early.
 
 If neither web search nor an interactive browser works, enter limited mode: use current evidence supplied by the user, keep unsupported dynamic facts `unknown` or `login_required`, and do not describe the result as a fully verified current itinerary. Never request provider keys in chat or copy host credentials into this repository.
 
@@ -93,7 +96,7 @@ Keep these layers separate:
 
 Current user evidence overrides stale search results. Official safety, closure, and ticket information overrides social evidence.
 
-State source and query time for facts that can drift. If a query fails, report unknown instead of estimating.
+State source and query time for facts that can drift. A failed query triggers the bounded fallback and retry protocol in `references/research-effort-contract.md`; report `unknown` only after an allowed stopping condition, never by estimating.
 
 ## Workflow
 

@@ -26,6 +26,10 @@ Without a working discovery capability, the Skill remains useful for candidate n
 
 AMap alone does not satisfy the general web-search requirement because it cannot establish rail inventory, flights, hotel prices, attraction ticket stock, scenic-area microclimate, or current crowd conditions.
 
+These capabilities do not have equal roles. Web search and the interactive browser are the live-discovery foundation; at least one must work for full dynamic planning. AMap is a narrow geography and driving enhancement. Authenticated 12306, hotel, attraction, or booking sessions are conditional verification channels required only when a decision depends on facts hidden behind login.
+
+If one search provider fails, do not collapse the whole host into limited mode while another provider or browser is available. Follow `research-effort-contract.md` for query reformulation, source changes, channel fallback, authentication boundaries, attempt logging, and bounded stopping conditions before a decision-critical fact becomes `unknown`.
+
 ## Enhanced AMap Claims
 
 Enhanced AMap mode improves geocoding and driving-route evidence and may provide short-horizon city-level baseline weather. It does not provide rail inventory, flights, hotel prices, attraction ticket stock, scenic-area microclimate, or crowd conditions. It offers no promised weather-coverage gain for the 8-14 day switching window.

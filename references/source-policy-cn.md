@@ -16,6 +16,8 @@ Route discovery as follows:
 
 A provider's authority label is only a ranking hint. Open the original result and classify the underlying first-party or supporting source using the policy below. Keep provider credentials and setup at the host layer; never ask the user to paste a key into chat or store it in this repository.
 
+This file decides source authority; `research-effort-contract.md` decides how much bounded search effort is required. For a decision-critical dynamic fact, one failed query is not enough for `unknown`: reformulate the query, change source class, and try another available provider or interactive browser as required there.
+
 ## Source Priority
 
 | Domain | Primary evidence | Supporting evidence |
@@ -45,6 +47,8 @@ Map every dynamic claim to a record with this shape:
   "source_url": null,
   "queried_at": "ISO-8601 timestamp",
   "valid_for": "exact travel date",
+  "attempt_log": [],
+  "exhaustion_reason": null,
   "notes": "User must confirm in authenticated app"
 }
 ```
@@ -53,10 +57,10 @@ Use exactly one of four statuses:
 
 - `verified`: direct, current official or first-party evidence supports the claim;
 - `auxiliary`: credible marketplace, review, or experience evidence supports context but is not authoritative;
-- `unknown`: the query failed or no reliable source was available;
+- `unknown`: the bounded protocol in `research-effort-contract.md` reached an allowed stopping condition without reliable evidence;
 - `login_required`: the next check requires the user's authenticated session.
 
-`unknown` and `login_required` are not negative facts. They make a related hard gate `undecidable`, never automatically `pass` or `fail`. Carry each unresolved decision-critical item into `pending_gates` with the exact authenticated check, screenshot, date/route lookup, or other user action required.
+`unknown` and `login_required` are not negative facts. They make a related hard gate `undecidable`, never automatically `pass` or `fail`. Carry each unresolved decision-critical item into `pending_gates` with the exact authenticated check, screenshot, date/route lookup, or other user action required. Keep the full `attempt_log` internal unless an unresolved fact affects the decision; then summarize attempted source classes, channels, failure reasons, and the stopping condition without dumping routine traces.
 
 ## Freshness and Precision
 
