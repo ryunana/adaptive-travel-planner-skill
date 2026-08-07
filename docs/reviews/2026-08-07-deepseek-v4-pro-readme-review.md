@@ -5,13 +5,15 @@
 - **Reviewer:** DeepSeek V4 Pro
 - **Review mode:** read-only, full README supplied inline, no repository tools
 - **Verdict:** **APPROVE WITH CHANGES**
-- **Status:** findings recorded; README not modified in this review pass
+- **Status:** resolved; accepted findings applied in `fa4bc78cc48ed2780b17a478d97d9a6e78a6996c`
 
 ## Executive summary
 
 DeepSeek found no blocking security, privacy, or factual issue. It reported eight Important findings and seven Polish findings. The strongest findings concern capability expectation management, untranslated machine status codes, a real-place example that can be mistaken for current evidence, and prerequisites/attribution around the `npx skills` installer.
 
 Hermes independently checked every finding before adoption. D1, D3, D4, D6, D8, D10, D13, and D15 are accepted; D2 and D7 are accepted only after correcting the reviewer's factual overreach; D5, D9, D11, D12, and D14 are not accepted as stated.
+
+All accepted findings were implemented in `fa4bc78cc48ed2780b17a478d97d9a6e78a6996c`. The rejected findings remain unchanged for the reasons recorded below.
 
 ## Independent external fact check
 
@@ -154,22 +156,22 @@ The reviewer made two claims that depend on current external facts. They were ch
 
 | Finding | Severity | Disposition | README change status |
 |---|---|---|---|
-| D1 | Important | 采纳 | Pending |
-| D2 | Important | 采纳但调整 | Pending |
-| D3 | Important | 采纳 | Pending |
-| D4 | Important | 采纳 | Pending |
-| D5 | Important | 不采纳 | No change |
-| D6 | Important | 采纳 | Pending |
-| D7 | Important | 采纳但调整 | Pending |
-| D8 | Important | 采纳 | Pending |
-| D9 | Polish | 不采纳 | No change |
-| D10 | Polish | 采纳 | Pending |
-| D11 | Polish | 不采纳原论证；可顺带调整 | Optional |
-| D12 | Polish | 不采纳 | No change |
-| D13 | Polish | 采纳 | Pending |
-| D14 | Polish | 不采纳 | No change |
-| D15 | Polish | 采纳 | Pending |
+| D1 | Important | 采纳 | Applied in `fa4bc78` |
+| D2 | Important | 采纳但调整 | Applied in `fa4bc78` |
+| D3 | Important | 采纳 | Applied in `fa4bc78` |
+| D4 | Important | 采纳 | Applied in `fa4bc78` |
+| D5 | Important | 不采纳 | Closed; no change |
+| D6 | Important | 采纳 | Applied in `fa4bc78` |
+| D7 | Important | 采纳但调整 | Applied in `fa4bc78` |
+| D8 | Important | 采纳 | Applied in `fa4bc78` |
+| D9 | Polish | 不采纳 | Closed; no change |
+| D10 | Polish | 采纳 | Applied in `fa4bc78` |
+| D11 | Polish | 不采纳原论证；可顺带调整 | Closed; no change |
+| D12 | Polish | 不采纳 | Closed; no change |
+| D13 | Polish | 采纳 | Applied in `fa4bc78` |
+| D14 | Polish | 不采纳 | Closed; no change |
+| D15 | Polish | 采纳 | Applied in `fa4bc78` |
 
 ## Current release implication
 
-The reviewer found no blocking issue. The README is publishable in its current form, but the accepted Important findings should be resolved before calling the public documentation polished. No README or implementation file was changed as part of this review pass.
+The reviewer found no blocking issue. All accepted Important and Polish findings are now resolved in `fa4bc78`; the README content review is closed. The implementation code was not changed by this review cycle.
