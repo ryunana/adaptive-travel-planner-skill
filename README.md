@@ -2,6 +2,8 @@
 
 [![skills.sh](https://skills.sh/b/ryunana/adaptive-travel-planner-skill)](https://skills.sh/ryunana/adaptive-travel-planner-skill)
 
+> Evidence-based, fatigue-aware travel planning for Agent tools. Private traveler profiles stay local; dynamic facts must be verified or marked unknown.
+
 **先选对目的地，再排对行程。**
 
 给它几个候选地、可用天数和你的旅行边界。它不会立刻生成几份很快过期的详细攻略，而是先做三件事：
@@ -12,9 +14,9 @@
 
 结果会给出去向，也会说明为什么、什么条件下不能去、什么时候需要重新查询，以及走累了该怎么停。
 
-> Evidence-based, fatigue-aware travel planning for Agent tools. Private traveler profiles stay local; dynamic facts must be verified or marked unknown.
+## 快速开始
 
-## 30 秒试用
+下面使用 Vercel Labs 的 [`skills`](https://github.com/vercel-labs/skills) 安装器，需要 Node.js `>=22.20.0`。Codex 的 Skill 格式和官方用户目录说明见 [Build Skills 文档](https://developers.openai.com/codex/build-skills)。
 
 ```bash
 npx skills add ryunana/adaptive-travel-planner-skill -g -a codex -y
@@ -109,7 +111,7 @@ cp templates/traveler-profile.template.md references/traveler-profile.md
 
 ### 3. 安装到支持 Agent Skill 的工具
 
-以 Codex 为例，按当前[官方 Build Skills 文档](https://developers.openai.com/codex/build-skills)，首选用 skills.sh 安装到当前用户：
+Codex 的[官方 Build Skills 文档](https://developers.openai.com/codex/build-skills)使用 `$HOME/.agents/skills` 作为用户级 Skill 目录。要自动安装到该目录并关联 Codex，可以使用 Vercel Labs 的 `skills` 安装器（需要 Node.js `>=22.20.0`）：
 
 ```bash
 npx skills add ryunana/adaptive-travel-planner-skill -g -a codex -y
@@ -122,7 +124,9 @@ mkdir -p ~/.agents/skills
 ln -s "$(pwd)" ~/.agents/skills/adaptive-travel-planner
 ```
 
-Hermes Agent 可将仓库放到或链接到 `$HERMES_HOME/skills/`（未自定义时通常是 `~/.hermes/skills/`）；Claude Code 可按其当前文档放到 `~/.claude/skills/`。不同 Agent 工具的 Skill 目录和格式可能变化，请以对应工具的当前官方文档为准。核心内容都在 `SKILL.md` 和 `references/` 中，可以按需要迁移；后续新增的 `agents/openai.yaml` 仅用于 Codex 元数据发现，不代表核心 Skill 只能在 Codex 中使用。
+Hermes Agent 可将仓库放到或链接到 `$HERMES_HOME/skills/`，未自定义时通常是 `~/.hermes/skills/`。Claude Code 可按其当前文档放到 `~/.claude/skills/`。
+
+不同 Agent 工具的 Skill 目录和格式可能变化，请以对应工具的当前官方文档为准。核心内容位于 `SKILL.md` 和 `references/`，可以按需要迁移。`agents/openai.yaml` 只用于 Codex 元数据发现，不代表这个 Skill 只能在 Codex 中使用。
 
 ### 4. 在普通聊天 AI 中使用
 
@@ -174,7 +178,9 @@ Hermes Agent 可将仓库放到或链接到 `$HERMES_HOME/skills/`（未自定�
 
 ### 安全设置高德 Key
 
-先在[高德开放平台](https://lbs.amap.com/api/webservice/guide/create-project/get-key)完成开发者认证，创建 **Web 服务** Key，再运行：
+高德增强模式完全可选，不配置也不影响零配置模式。高德开放平台注册可能需要绑定手机号并完成实名认证；如果不方便注册，可以跳过本节。
+
+愿意启用增强模式时，先在[高德开放平台](https://lbs.amap.com/api/webservice/guide/create-project/get-key)完成开发者认证，创建 **Web 服务** Key，再运行：
 
 ```bash
 python3 scripts/setup_amap.py
@@ -193,12 +199,16 @@ python3 scripts/setup_amap.py --do-not-ask-again
 
 Skill 要求 AI 首先比较 2至3个**实质不同**的方案：
 
-| 方案 | 预期体验 | 天气适配 | 门到门成本 | 复合负荷 | 机动性 | 最大风险 | 结论 |
+| 方案 | 预期体验 | 天气适配 | 门到门成本 | 复合负荷 | 切换弹性 | 最大风险 | 结论 |
 |---|---|---|---|---|---|---|---|
+
+“切换弹性”指行程中途调整的难易程度，例如能否跳过部分安排、改签或换线成本，以及附近是否有可用备选。
 
 比较后必须给出排序和明确首选。
 
-目的地未定时，比较结果会先展示原始候选、归一化后的本次路线与最少可行天数，再给出证据状态、硬门槛和评分。例如：
+目的地未定时，比较结果会先展示原始候选、归一化后的本次路线与最少可行天数，再给出证据状态、硬门槛和评分。
+
+> 以下内容仅用于展示输出结构。所有地名、天数和证据状态均为虚构示例，不代表这些目的地的当前事实，也不能据此做旅行决策。
 
 | 排名 | 原始候选 → 本次比较形态 | 最少可行天数 | 动态证据 | 硬门槛 | 本次结论 |
 |---:|---|---:|---|---|---|
@@ -206,7 +216,11 @@ Skill 要求 AI 首先比较 2至3个**实质不同**的方案：
 | 2 | 甘南 → 兰州进出小环线 8 日 | 8 | 路线与天气已核验 | `pass` | 可切换备选 |
 | — | 北疆大环线 → 无法压缩为 8 日 | 12 | 不进入评分 | `fail` | 延期，说明更合适窗口 |
 
+状态码说明：`pass` 表示通过硬门槛，`fail` 表示不通过，`undecidable` 表示当前证据不足以判断，`pending_gates` 表示仍有待确认的硬门槛，`login_required` 表示需要登录后获取，`unknown` 表示未查到，`verified_working` 表示能力已经实际验证可用。
+
 最终输出包含一句话排序结论、每个候选的证据比较、第一名完整日程、第二名简要路线与切换条件、延期理由、72 小时复核清单，以及所有未决硬门槛的 `pending_gates`。第二名不是可直接执行的旧备份；触发切换时需要重新核验超过 24 小时的动态信息。
+
+以下字段是检索和核验目标，不是每次都能完整获取的保证。零配置模式与高德增强模式都无法覆盖所有实时信息；逐小时天气、景区内部顺序、实时停车等信息缺少可靠来源时必须标为 `unknown`。完整边界见 [references/capability-matrix.md](references/capability-matrix.md)。
 
 每个核心项目还应包含：
 
@@ -258,6 +272,24 @@ Skill 要求 AI 首先比较 2至3个**实质不同**的方案：
 - 问题来自目的地本身，还是来自错误季节、天气、顺序或交通方式。
 
 例如，同一个山景目的地可以同时拥有“晴天潜力9分”和“本次大雾实际5分”。把两者分开，AI才不会因为一次坏天气永久排除目的地，也不会忽略再次踩坑的条件。
+
+## 常见问题
+
+### 运行安装命令时提示找不到 `npx`
+
+Vercel Labs 的 `skills` 安装器需要 Node.js `>=22.20.0`。安装或升级 Node.js 后重新打开终端，再运行首屏命令；也可以跳过 `npx`，按上文把仓库手工链接到对应的 Skill 目录。
+
+### 安装后 Agent 没有发现这个 Skill
+
+确认 Skill 目录中存在 `adaptive-travel-planner/SKILL.md`，然后新建或重启 Agent 会话。不同工具的扫描目录可能变化，请以该工具当前文档为准。
+
+### 高德验证失败怎么办
+
+先运行 `python3 scripts/verify_amap.py` 查看哪一步失败。不要把 Key 粘贴到聊天、日志或 Issue；可以直接继续使用零配置模式，目的地筛选不会因此中断。
+
+### 查不到票价、余票、开放状态或逐小时天气怎么办
+
+保留 `unknown` 或 `login_required`，并把它列入出发前复核清单。不要用估算值或过期截图补齐表格。
 
 ## 项目结构
 
