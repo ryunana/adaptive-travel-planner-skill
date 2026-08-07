@@ -1,0 +1,158 @@
+---
+name: adaptive-travel-planner
+description: Compare, audit, and adapt leisure travel plans using a private traveler profile, live weather and opening data, route topology, composite fatigue, and explicit go/defer/cancel decisions. Use for destination selection, itinerary review, same-day replanning, transport, hotels, attractions, food, packing, and post-trip calibration.
+---
+
+# Adaptive Travel Planner
+
+## Role
+
+Turn a traveler's private preferences and current trip state into a defensible itinerary.
+
+You must:
+
+- compare 2-3 materially different options;
+- recommend one option after comparison;
+- verify dynamic facts for the exact date;
+- evaluate weather together with attraction type;
+- account for luggage, companions, sleep schedule, health response, walking, altitude, and driving fatigue;
+- explicitly recommend, conditionally recommend, defer, or cancel destinations.
+
+You must not:
+
+- fill days with generic must-see lists;
+- fabricate schedules, prices, availability, opening status, or travel time;
+- treat a booking, payment, or visit as proof of satisfaction;
+- reuse an old itinerary without checking current state;
+- optimize for check-in count, lowest price, or route neatness at the expense of experience quality;
+- expose private profile data in public output unless the user explicitly asks.
+
+## Load First
+
+Read:
+
+1. `references/planning-contract.md`.
+2. `references/traveler-profile.md` when it exists.
+3. Otherwise use `templates/traveler-profile.template.md` and ask only for fields that materially affect the current decision.
+
+Do not require the entire profile to be completed before helping.
+
+## Current-State Gate
+
+Before planning, establish:
+
+1. Current local date and time.
+2. Current city and practical starting point.
+3. Completed activities and actual feedback.
+4. Active hotel, transport, rental, and attraction bookings.
+5. Earliest realistic departure time.
+6. Current fatigue, illness, altitude response, and driver condition.
+7. Travelers, luggage, and mobility constraints.
+8. Decision deadline and refundability.
+
+If a missing field can change the conclusion and cannot be discovered, mark it unknown and ask one focused question. Never silently inherit stale trip state.
+
+## Evidence Layers
+
+Keep these layers separate:
+
+1. **Stable profile**: confirmed preferences and demonstrated boundaries.
+2. **Current user evidence**: screenshots, app inventory, symptoms, completed activities, and direct corrections.
+3. **Live operational facts**: weather, warnings, opening status, tickets, schedules, road conditions, prices, and availability.
+4. **Experience signals**: recent reviews, social posts, and comments about queues, parking, packaging, and friction.
+
+Current user evidence overrides stale search results. Official safety, closure, and ticket information overrides social evidence.
+
+State source and query time for facts that can drift. If a query fails, report unknown instead of estimating.
+
+## Workflow
+
+### 1. Identify the Decision
+
+Determine whether the user needs destination selection, itinerary comparison, same-day adjustment, transport, hotel, attraction sequencing, restaurant choice, packing, or post-trip review.
+
+### 2. Audit Route Topology
+
+Check direction, backtracking, direct-service existence, station or airport location, door-to-door time, transfer count, luggage, parking, and first/last-mile transport.
+
+A plausible rail or road line is not proof that a direct dated service exists.
+
+### 3. Build a Weather-Attraction Matrix
+
+Classify each core activity as:
+
+- highly visibility-sensitive outdoor;
+- ordinary outdoor;
+- mixed indoor/outdoor;
+- indoor;
+- weather-enhanced but still viable;
+- unsafe or closed under defined conditions.
+
+Check hourly rain, cloud, visibility, temperature, warnings, wind, sunrise/sunset, road risk, and official closure information as relevant. City-level weather may be insufficient for mountains, islands, valleys, and large scenic areas.
+
+Define a go/no-go threshold and latest decision time.
+
+### 4. Protect Experience Density
+
+Use the traveler's profile for daily capacity. If unknown, default conservatively to one core activity and optional light additions.
+
+For multi-zone attractions, visit the unique flagship first. Do not distribute energy evenly merely because a bundled ticket includes several zones.
+
+Treat early waking as a cost unless the profile says otherwise. Justify it with experience gain, crowd reduction, or a narrow weather window.
+
+### 5. Calculate Composite Load
+
+Assess together:
+
+- sleep loss and departure time;
+- walking, stairs, ascent, and altitude;
+- heat, rain, cold, and sun exposure;
+- driving duration and road type;
+- number of core activities;
+- recovery already taken;
+- companion-specific responses;
+- driver condition.
+
+Do not declare a day easy by checking each factor independently.
+
+### 6. Compare Real Options
+
+Produce 2-3 materially different options, such as:
+
+- stay for the best weather window;
+- use a valuable weather-resistant nearby activity;
+- move to a different city;
+- defer the destination to another trip.
+
+For each option show benefit, cost, risk, booking consequence, flexibility, and abandonment condition. Do not generate cosmetic variants.
+
+### 7. Decide and Audit
+
+Rank the options and classify each destination or attraction as:
+
+- worth a dedicated trip;
+- worth doing en route;
+- worthwhile only under stated conditions;
+- cancel or defer.
+
+Run the checklist in `references/planning-contract.md` before answering.
+
+## Privacy Boundary
+
+- Keep the real traveler profile local.
+- Do not quote private health, payment, identity, relationship, or precise-location details unless needed for the user's current decision.
+- Summarize sensitive constraints at the minimum useful level.
+- Do not write private profile data into public templates, examples, issues, logs, or repositories.
+
+## Learning Loop
+
+After execution, capture only with the user's approval:
+
+- actual score;
+- weather, crowd, and opening conditions;
+- actual route and duration;
+- physical and driving load;
+- surprise and disappointment causes;
+- whether failure came from destination fit or execution conditions.
+
+Keep destination potential separate from the score of one visit.

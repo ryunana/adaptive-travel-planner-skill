@@ -1,0 +1,27 @@
+# Private traveler data
+references/traveler-profile.md
+private/
+exports/
+screenshots/
+
+# Credentials and local state
+.env
+.env.*
+*.sqlite
+*.sqlite3
+*.db
+*.cookie
+*.cookies
+
+# Raw personal exports
+*.eml
+*.csv
+*.jsonl
+*.gpx
+*.fit
+*.tcx
+
+# OS and editor
+.DS_Store
+.idea/
+.vscode/
