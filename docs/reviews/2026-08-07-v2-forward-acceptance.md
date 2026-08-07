@@ -67,7 +67,7 @@ capability.amap.state=installed_but_unconfigured
 评审时临时检查记录（该脚本未跟踪，不是仓库公开可复跑命令）：
 
 ```text
-$ python3 /tmp/adaptive-travel-planner-v2-acceptance/check_scenarios.py
+[review-time temporary harness; untracked and not a public command]
 scenario_contract_pass=8/8
 itinerary_validation_pass=8/8
 ```
@@ -149,7 +149,7 @@ key_source=environment
 | B15 | High / Configuration safety | fixed | 损坏配置可被覆盖，任意已有父目录权限可被改变 | 损坏配置独立状态并逐字节保留；只保护默认或新建目录权限 |
 | B16 | High / Provider validation | fixed | AMap 成功状态缺少端点结构、畸形本地参数仍可进入网络 | geocode/route/weather 分别验证容器与记录；地址、坐标、adcode 在网络前验证 |
 | B17 | High / Release integrity | fixed | 非 UTF-8 文件 fail-open、非法 YAML 与 reference/fragment 链接漏检 | 混合编码 fail-closed；PyYAML safe_load；完整本地链接与 heading 检查 |
-| B18 | High / Adversarial boundaries | fixed; pending re-review | 无引号 Key、配置语义类型、证据完整性、provider Key 反射、超大数值/深度、私有路径错误、零配置偏好、配置权限与超宽日期跨度 | 新增逐项回归；严格 JSON 与通用错误保持无 traceback/无敏感值 |
+| B18 | High / Adversarial boundaries | fixed; independently re-reviewed | 无引号 Key、配置语义类型、证据完整性、provider Key 反射、超大数值/深度、私有路径错误、零配置偏好、配置权限与超宽日期跨度 | 88 项单元测试与 R15–R27 独立反例重放通过；严格 JSON 与通用错误保持无 traceback/无敏感值 |
 | I1 | Info / Release state | untestable | README 公网 clone 目前只能得到 main，不含 V2 | 发布后按同一走查重测 |
 
 ## 6. 已决策评分语义
@@ -200,7 +200,7 @@ release checks passed: metadata, 17 resources, links, privacy
 $ mypy scripts
 Success: no issues found in 8 source files
 
-$ python3 /tmp/adaptive-travel-planner-v2-acceptance/check_scenarios.py
+[independent review-time harness regenerated from fresh synthetic data; untracked]
 scenario_contract_pass=8/8
 itinerary_validation_pass=8/8
 
@@ -211,3 +211,11 @@ No findings to report
 评分语义回归验证 rank=`1,1,3`、tied=`true,true,false`、1/9 verified confidence=`coverage .111 / authority 1.0 / value .111`、无已有记录时 authority=`0.0`。畸形候选/行程输入、矛盾 hard gate、布尔和非有限数值、timeout、输入/响应尺寸边界、AMap 中断与端点响应 shape、损坏配置、混合编码、非法 YAML、reference/fragment 链接均有回归；所有 CLI 错误保持单一严格 JSON、非零退出且 stderr 无 traceback/secret。AMap 畸形 location fixture 回归验证 geocode 阶段结构化 `malformed_response` 且不调用 route/weather。
 
 仓库内容隐私扫描无命中；`git ls-remote --heads origin agent/china-destination-selection-v2` 无输出，确认未推送该分支。本次没有执行 push，也没有切换分支或改动 main。
+
+## 9. 独立终审与发布判定
+
+独立终审针对实现提交 `d739bcb24595b6e6a09797b6977b416a13a151a8` 完成，详细证据见 `docs/reviews/2026-08-07-v2-final-code-review.md`。终审亲自重放 R15–R27 合成反例，复跑 88/88 单元测试、release checks、Ruff、mypy、compileall、Bandit、zizmor、pip-audit 和 Luban；另以全新虚构输入生成 8 个场景，得到 8/8 场景契约与 8/8 行程校验。85,000 个随机结构化输入未产生未捕获异常或非严格 JSON 输出，main..HEAD 逐提交树语义隐私扫描为 0 命中。
+
+唯一保留项是 R24b：配置文件读取后再按路径检查权限存在本地符号链接 TOCTOU 窗口。该问题要求攻击者已经具有配置目录写权限，并不扩大其相对于直接读取 0644 文件的权限，因此按 defense-in-depth Minor 接受，不阻断本次发布。
+
+**发布判定：已达到 push / PR 门槛。** 实际 push 仍需用户明确批准。推送后必须等待 GitHub Actions 全绿，并从公开仓库重新执行 README 一行安装和新用户走查；有效 AMap Key 的成功 live smoke 仍需用户授权后才能执行，未授权时继续标记 `untestable`，不得虚构结果。
