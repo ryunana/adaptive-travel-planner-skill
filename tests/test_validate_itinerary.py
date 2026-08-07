@@ -36,5 +36,40 @@ class ItineraryTests(unittest.TestCase):
     def test_unsupported_dynamic_claim(self):
         self.assertIn("unsupported_dynamic_claim", self.codes("itinerary_unsupported_claim.json"))
 
+    def test_core_activities_must_be_an_array(self):
+        import validate_itinerary
+        for value in (None, "activity", {}):
+            with self.subTest(value=value):
+                payload = load("itinerary_valid.json")
+                payload["days"][0]["core_activities"] = value
+                codes = {item["code"] for item in validate_itinerary.validate(payload)["issues"]}
+                self.assertIn("invalid_core_activities", codes)
+
+    def test_dynamic_claim_fields_require_valid_strings(self):
+        import validate_itinerary
+        cases = (
+            ("status", [], "evidence_status_invalid"),
+            ("source", [], "evidence_source_invalid"),
+            ("source", "   ", "evidence_source_invalid"),
+            ("queried_at", {}, "evidence_query_time_invalid"),
+            ("queried_at", "", "evidence_query_time_invalid"),
+        )
+        for field, value, expected in cases:
+            with self.subTest(field=field, value=value):
+                payload = load("itinerary_valid.json")
+                payload["dynamic_claims"] = [{
+                    "status": "verified", "value": "open", "source": "official", "queried_at": "2026-08-07T12:00:00Z"
+                }]
+                payload["dynamic_claims"][0][field] = value
+                codes = {item["code"] for item in validate_itinerary.validate(payload)["issues"]}
+                self.assertIn(expected, codes)
+
+    def test_boolean_activity_limit_is_invalid(self):
+        import validate_itinerary
+        payload = load("itinerary_valid.json")
+        payload["max_core_activities_per_day"] = True
+        codes = {item["code"] for item in validate_itinerary.validate(payload)["issues"]}
+        self.assertIn("load_limit_invalid", codes)
+
 
 if __name__ == "__main__": unittest.main()

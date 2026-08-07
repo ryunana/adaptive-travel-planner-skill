@@ -98,9 +98,46 @@ class ReleaseChecksTests(unittest.TestCase):
                 release_checks.validate_openai_metadata(skill, metadata),
                 [
                     "openai.yaml display_name must match SKILL.md name",
-                    "openai.yaml short_description must match the start of SKILL.md description",
+                    "openai.yaml short_description must be consistent with SKILL.md description",
                 ],
             )
+
+    def test_openai_short_description_must_be_nonempty_and_at_most_64_characters(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            skill = root / "SKILL.md"
+            metadata = root / "openai.yaml"
+            skill.write_text(
+                "---\nname: sample-skill\ndescription: Compare sample destinations safely.\n---\n# Sample\n",
+                encoding="utf-8",
+            )
+            metadata.write_text(
+                'interface:\n  display_name: "Sample Skill"\n  short_description: ""\n',
+                encoding="utf-8",
+            )
+            self.assertIn(
+                "openai.yaml short_description must be non-empty",
+                release_checks.validate_openai_metadata(skill, metadata),
+            )
+            metadata.write_text(
+                'interface:\n  display_name: "Sample Skill"\n  short_description: "' + ("x" * 65) + '"\n',
+                encoding="utf-8",
+            )
+            self.assertIn(
+                "openai.yaml short_description must be at most 64 characters",
+                release_checks.validate_openai_metadata(skill, metadata),
+            )
+
+    def test_readme_install_uses_current_agents_skills_directory(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("https://developers.openai.com/codex/build-skills", readme)
+        self.assertIn("https://skills.sh/b/ryunana/adaptive-travel-planner-skill", readme)
+        self.assertIn("npx skills add ryunana/adaptive-travel-planner-skill -g -a codex -y", readme)
+        self.assertIn(
+            'mkdir -p ~/.agents/skills\nln -s "$(pwd)" ~/.agents/skills/adaptive-travel-planner',
+            readme,
+        )
+        self.assertNotIn("~/.codex/skills", readme)
 
     def test_required_release_resources_exist_in_repository(self):
         self.assertEqual(release_checks.validate_required_resources(ROOT), [])

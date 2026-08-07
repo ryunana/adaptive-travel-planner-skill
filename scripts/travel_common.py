@@ -2,6 +2,7 @@
 """Shared configuration, CLI, and JSON helpers for travel-planner scripts."""
 import argparse
 import json
+import math
 import os
 import sys
 from pathlib import Path
@@ -15,6 +16,17 @@ class JsonArgumentParser(argparse.ArgumentParser):
     def error(self, message):
         emit({"ok": False, "error": {"code": "invalid_arguments", "message": message}})
         raise SystemExit(2)
+
+
+def positive_finite_float(value):
+    """Parse a strictly positive finite command-line number."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise argparse.ArgumentTypeError("must be a number") from exc
+    if not math.isfinite(number) or number <= 0:
+        raise argparse.ArgumentTypeError("must be positive and finite")
+    return number
 
 
 def load_config(path=None):

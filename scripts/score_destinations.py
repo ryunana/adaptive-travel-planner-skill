@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Deterministically score normalized destination candidates from JSON."""
+import math
 from copy import deepcopy
 
 from travel_common import JsonArgumentParser, emit, read_json
@@ -15,6 +16,8 @@ DEFAULT_WEIGHTS = {
     "current_value_for_money": 5,
 }
 AUTHORITY = {"verified": 1.0, "auxiliary": 0.6, "unknown": 0.0, "login_required": 0.0}
+GATE_STATES = {"pass", "fail", "undecidable"}
+EVIDENCE_STATUSES = set(AUTHORITY)
 
 
 def confidence(candidate, weights):
@@ -43,7 +46,7 @@ def score_candidate(candidate, weights):
         "better_window": candidate.get("better_window"),
     }
     gates = candidate.get("hard_gates", [])
-    invalid_states = [gate.get("state") for gate in gates if gate.get("state") not in {"pass", "fail", "undecidable"}]
+    invalid_states = [gate.get("state") for gate in gates if gate.get("state") not in GATE_STATES]
     if invalid_states:
         output.update({"decision_status": "invalid", "suitability_score": None, "error": "hard gates must be pass, fail, or undecidable"})
         output["evidence_confidence"] = confidence(candidate, weights)
@@ -88,20 +91,43 @@ def score_payload(payload):
     weights = payload.get("weights", DEFAULT_WEIGHTS)
     if not isinstance(weights, dict) or set(weights) != set(DEFAULT_WEIGHTS):
         return {"ok": False, "error": {"code": "invalid_weights", "message": "Weights must include exactly the eight documented dimensions"}}
-    try:
-        weights = {key: float(value) for key, value in weights.items()}
-    except (TypeError, ValueError):
+    if any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in weights.values()):
         return {"ok": False, "error": {"code": "invalid_weights", "message": "Weights must be numeric"}}
-    if any(value < 0 for value in weights.values()) or abs(sum(weights.values()) - 100) > 1e-9:
+    weights = {key: float(value) for key, value in weights.items()}
+    if any(not math.isfinite(value) or value < 0 for value in weights.values()) or abs(sum(weights.values()) - 100) > 1e-9:
         return {"ok": False, "error": {"code": "invalid_weights", "message": "Weights must be nonnegative and total 100"}}
     raw_candidates = payload.get("candidates", [])
     if not isinstance(raw_candidates, list) or any(not isinstance(candidate, dict) for candidate in raw_candidates):
         return {"ok": False, "error": {"code": "invalid_candidates", "message": "candidates must be an array of JSON objects"}}
     for candidate in raw_candidates:
+        if not isinstance(candidate.get("name"), str) or not candidate["name"].strip():
+            return {"ok": False, "error": {"code": "invalid_candidate", "message": "candidate name must be a non-empty string"}}
         if not isinstance(candidate.get("dimensions", {}), dict) or not isinstance(candidate.get("hard_gates", []), list):
             return {"ok": False, "error": {"code": "invalid_candidate", "message": "candidate dimensions must be an object and hard_gates must be an array"}}
-        if any(not isinstance(gate, dict) for gate in candidate.get("hard_gates", [])):
+        gates = candidate.get("hard_gates", [])
+        if any(not isinstance(gate, dict) for gate in gates):
             return {"ok": False, "error": {"code": "invalid_candidate", "message": "every hard gate must be a JSON object"}}
+        for gate in gates:
+            state = gate.get("state")
+            if not isinstance(state, str) or state not in GATE_STATES:
+                return {"ok": False, "error": {"code": "invalid_candidate", "message": "hard gate state must be pass, fail, or undecidable"}}
+            status = gate.get("evidence_status")
+            if not isinstance(status, str) or status not in EVIDENCE_STATUSES:
+                return {"ok": False, "error": {"code": "invalid_candidate", "message": "hard gate evidence_status is invalid"}}
+        for record in candidate["dimensions"].values():
+            if not isinstance(record, dict):
+                return {"ok": False, "error": {"code": "invalid_candidate", "message": "every dimension must be a JSON object"}}
+            status = record.get("evidence_status")
+            if not isinstance(status, str) or status not in EVIDENCE_STATUSES:
+                return {"ok": False, "error": {"code": "invalid_candidate", "message": "dimension evidence_status is invalid"}}
+            value = record.get("score")
+            if value is not None and (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or not 0 <= value <= 5
+            ):
+                return {"ok": False, "error": {"code": "invalid_candidate", "message": "dimension score must be a finite number from 0 to 5"}}
     candidates = [score_candidate(candidate, weights) for candidate in raw_candidates]
     pending = []
     for candidate in candidates:

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 import subprocess
-import sys
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -93,13 +92,17 @@ def validate_openai_metadata(skill_path: Path, metadata_path: Path) -> list[str]
     name = skill_fields.get("name", "")
     description = skill_fields.get("description", "")
     expected_display_name = name.replace("-", " ").title()
-    expected_short_description = description[:64].rsplit(" ", 1)[0]
+    short_description = openai_fields.get("short_description", "")
 
     issues = []
     if openai_fields.get("display_name") != expected_display_name:
         issues.append("openai.yaml display_name must match SKILL.md name")
-    if openai_fields.get("short_description") != expected_short_description:
-        issues.append("openai.yaml short_description must match the start of SKILL.md description")
+    if not short_description.strip():
+        issues.append("openai.yaml short_description must be non-empty")
+    elif len(short_description) > 64:
+        issues.append("openai.yaml short_description must be at most 64 characters")
+    if short_description.strip() and description and short_description.split()[0].lower() != description.split()[0].lower():
+        issues.append("openai.yaml short_description must be consistent with SKILL.md description")
     return issues
 
 

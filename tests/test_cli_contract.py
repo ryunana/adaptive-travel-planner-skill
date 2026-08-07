@@ -20,6 +20,7 @@ class CliContractTests(unittest.TestCase):
             input=input_text,
             text=True,
             capture_output=True,
+            check=False,
             timeout=10,
         )
 
@@ -78,6 +79,48 @@ class CliContractTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 payload = json.loads(result.stdout)
                 self.assertFalse(payload["ok"])
+
+    def test_reported_nested_shape_regressions_remain_structured_json(self):
+        cases = (
+            ("score_destinations", '{"candidates":[{"name":"A","hard_gates":[{"state":[],"evidence_status":"verified"}],"dimensions":{}}]}'),
+            ("score_destinations", '{"candidates":[{"name":"A","hard_gates":[{"state":"pass","evidence_status":[]}],"dimensions":{}}]}'),
+            ("score_destinations", '{"candidates":[{"name":"A","hard_gates":[],"dimensions":{"preference_fit":{"score":4,"evidence_status":[]}}}]}'),
+            ("score_destinations", '{"weights":{"preference_fit":NaN,"seasonal_weather_fit":20,"core_experience_density":15,"access_route_friction":10,"crowd_ticket_friction":10,"bad_weather_resilience":10,"composite_load_fit":5,"current_value_for_money":5},"candidates":[]}'),
+            ("validate_itinerary", '{"start_date":"2026-08-07","end_date":"2026-08-07","hotel_nights":0,"days":[{"date":"2026-08-07","core_activities":null}],"route":[]}'),
+            ("validate_itinerary", '{"start_date":"2026-08-07","end_date":"2026-08-07","hotel_nights":0,"days":[{"date":"2026-08-07","core_activities":[]}],"route":[],"dynamic_claims":[{"status":[]}]}'),
+        )
+        for name, value in cases:
+            with self.subTest(name=name):
+                result = self.run_script(name, "-", input_text=value)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(result.stderr, "")
+                payload = json.loads(result.stdout, parse_constant=lambda value: self.fail(value))
+                self.assertFalse(payload["ok"])
+
+    def test_network_timeouts_must_be_positive_and_finite(self):
+        env = os.environ.copy()
+        env.pop("AMAP_API_KEY", None)
+        with tempfile.TemporaryDirectory() as directory:
+            config = str(Path(directory) / "missing.json")
+            for name, suffix in (("amap_cli", ("geocode", "x")), ("verify_amap", ())):
+                for value in ("0", "-1", "NaN", "Infinity", "-Infinity"):
+                    with self.subTest(name=name, value=value):
+                        result = self.run_script(name, "--config", config, "--timeout", value, *suffix, env=env)
+                        self.assertEqual(result.returncode, 2)
+                        self.assertEqual(result.stderr, "")
+                        payload = json.loads(result.stdout)
+                        self.assertEqual(payload["error"]["code"], "invalid_arguments")
+
+    def test_positive_finite_network_timeout_remains_accepted(self):
+        env = os.environ.copy()
+        env.pop("AMAP_API_KEY", None)
+        with tempfile.TemporaryDirectory() as directory:
+            config = str(Path(directory) / "missing.json")
+            for name, suffix in (("amap_cli", ("geocode", "x")), ("verify_amap", ())):
+                with self.subTest(name=name):
+                    result = self.run_script(name, "--config", config, "--timeout", "0.25", *suffix, env=env)
+                    self.assertEqual(result.returncode, 2)
+                    self.assertEqual(json.loads(result.stdout)["error"]["code"], "missing_key")
 
 
 if __name__ == "__main__": unittest.main()

@@ -4,7 +4,13 @@ import math
 from pathlib import Path
 
 from amap_cli import AMapClient
-from travel_common import DEFAULT_CONFIG, JsonArgumentParser, emit, get_api_key
+from travel_common import (
+    DEFAULT_CONFIG,
+    JsonArgumentParser,
+    emit,
+    get_api_key,
+    positive_finite_float,
+)
 
 
 def _failed(stage, result, completed):
@@ -52,7 +58,7 @@ def verify(client):
 def main(argv=None):
     parser = JsonArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
-    parser.add_argument("--timeout", type=float, default=10.0)
+    parser.add_argument("--timeout", type=positive_finite_float, default=10.0)
     args = parser.parse_args(argv)
     key, source = get_api_key(args.config)
     if not key:

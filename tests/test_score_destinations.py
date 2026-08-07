@@ -1,3 +1,4 @@
+import math
 import sys
 import unittest
 from pathlib import Path
@@ -22,6 +23,45 @@ def candidate(name, score: float = 4.0, status="verified", gates=None):
 
 
 class ScoreTests(unittest.TestCase):
+    def test_weights_reject_nonfinite_and_boolean_values(self):
+        import score_destinations
+        for invalid in (math.nan, math.inf, -math.inf, True, False):
+            with self.subTest(invalid=invalid):
+                weights = dict(score_destinations.DEFAULT_WEIGHTS)
+                weights["preference_fit"] = invalid
+                result = score_destinations.score_payload({"weights": weights, "candidates": []})
+                self.assertFalse(result["ok"])
+                self.assertEqual(result["error"]["code"], "invalid_weights")
+
+    def test_candidate_shapes_are_validated_before_scoring(self):
+        import score_destinations
+        cases = []
+        for mutation in (
+            lambda item: item.update(name="   "),
+            lambda item: item.update(dimensions=[]),
+            lambda item: item.update(hard_gates={}),
+            lambda item: item["hard_gates"].append([]),
+            lambda item: item["hard_gates"][0].update(state=[]),
+            lambda item: item["hard_gates"][0].update(evidence_status=[]),
+            lambda item: item["dimensions"]["preference_fit"].update(evidence_status=[]),
+            lambda item: item["dimensions"]["preference_fit"].update(score=True),
+            lambda item: item["dimensions"]["preference_fit"].update(score=math.inf),
+        ):
+            item = candidate("A")
+            mutation(item)
+            cases.append(item)
+        for item in cases:
+            with self.subTest(item=item):
+                result = score_destinations.score_payload({"candidates": [item]})
+                self.assertFalse(result["ok"])
+                self.assertEqual(result["error"]["code"], "invalid_candidate")
+
+    def test_default_weights_total_100_remain_valid(self):
+        import score_destinations
+        result = score_destinations.score_payload({"candidates": [candidate("A")]})
+        self.assertTrue(result["ok"])
+        self.assertEqual(sum(result["weights"].values()), 100)
+
     def test_hard_gate_fail_rejects_before_scoring(self):
         import score_destinations
         item = candidate("A", gates=[{"name": "closure", "state": "fail", "evidence_status": "verified"}])

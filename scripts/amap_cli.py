@@ -12,12 +12,19 @@ https://lbs.amap.com/pages/terms/
 The API requires a Web Service key. Quotas/QPS are account/product specific and
 must be read from the pricing page and authenticated console, not hard-coded.
 """
+import http.client
 import json
 import socket
 from pathlib import Path
 from urllib import error, parse, request
 
-from travel_common import DEFAULT_CONFIG, JsonArgumentParser, emit, get_api_key
+from travel_common import (
+    DEFAULT_CONFIG,
+    JsonArgumentParser,
+    emit,
+    get_api_key,
+    positive_finite_float,
+)
 
 BASE_URL = "https://restapi.amap.com"
 INVALID_KEY_CODES = {"10001", "10002", "10007"}
@@ -44,6 +51,8 @@ class AMapClient:
             if isinstance(getattr(exc, "reason", None), (TimeoutError, socket.timeout)):
                 return self._error("timeout", "AMap request timed out")
             return self._error("network_error", "AMap request failed")
+        except http.client.HTTPException:
+            return self._error("network_error", "AMap response was interrupted")
         except OSError:
             return self._error("network_error", "AMap request failed")
         try:
@@ -85,7 +94,7 @@ class AMapClient:
 def main(argv=None):
     parser = JsonArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG, help="configuration file path")
-    parser.add_argument("--timeout", type=float, default=10.0, help="network timeout in seconds")
+    parser.add_argument("--timeout", type=positive_finite_float, default=10.0, help="network timeout in seconds")
     sub = parser.add_subparsers(dest="command", required=True)
     geo = sub.add_parser("geocode", help="geocode an address")
     geo.add_argument("address")

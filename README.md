@@ -1,5 +1,7 @@
 # Adaptive Travel Planner Skill
 
+[![skills.sh](https://skills.sh/b/ryunana/adaptive-travel-planner-skill)](https://skills.sh/ryunana/adaptive-travel-planner-skill)
+
 一个面向自由行同好的自适应旅行规划 Skill。
 
 它不负责把热门景点塞满每一天，而是要求 AI 先确认**你现在在哪里、天气是否适合、景区是否开放、交通是否真实存在、当天是否已经过载**，再比较继续、替换、换城市或下次再来的真实方案。
@@ -83,10 +85,17 @@ cp templates/traveler-profile.template.md references/traveler-profile.md
 
 ### 3. 安装到支持 Agent Skill 的工具
 
-以 Codex 为例，可以复制或建立软链接：
+以 Codex 为例，按当前[官方 Build Skills 文档](https://developers.openai.com/codex/build-skills)，首选用 skills.sh 安装到当前用户：
 
 ```bash
-ln -s "$(pwd)" ~/.codex/skills/adaptive-travel-planner
+npx skills add ryunana/adaptive-travel-planner-skill -g -a codex -y
+```
+
+也可以把当前仓库手工链接到官方用户级 Skill 目录：
+
+```bash
+mkdir -p ~/.agents/skills
+ln -s "$(pwd)" ~/.agents/skills/adaptive-travel-planner
 ```
 
 Hermes Agent 可将仓库放到或链接到 `$HERMES_HOME/skills/`（未自定义时通常是 `~/.hermes/skills/`）；Claude Code 可按其当前文档放到 `~/.claude/skills/`。不同 Agent 工具的 Skill 目录和格式可能变化，请以对应工具的当前官方文档为准。核心内容都在 `SKILL.md` 和 `references/` 中，可以按需要迁移；后续新增的 `agents/openai.yaml` 仅用于 Codex 元数据发现，不代表核心 Skill 只能在 Codex 中使用。

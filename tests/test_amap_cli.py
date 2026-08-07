@@ -1,3 +1,4 @@
+import http.client
 import json
 import sys
 import unittest
@@ -59,6 +60,18 @@ class AMapClientTests(unittest.TestCase):
         def opener(request, timeout): raise TimeoutError("fixture timeout")
         result = amap_cli.AMapClient(SECRET, opener=opener).geocode("x")
         self.assertEqual(result["error"]["code"], "timeout")
+        self.assertNotIn(SECRET, json.dumps(result))
+
+    def test_incomplete_response_is_structured_and_redacted(self):
+        import amap_cli
+        class IncompleteResponse(Response):
+            def read(self):
+                raise http.client.IncompleteRead(b"partial", 100)
+        def opener(request, timeout):
+            return IncompleteResponse(b"")
+        result = amap_cli.AMapClient(SECRET, opener=opener).geocode("x")
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["error"]["code"], "network_error")
         self.assertNotIn(SECRET, json.dumps(result))
 
     def test_route_and_weather_success(self):

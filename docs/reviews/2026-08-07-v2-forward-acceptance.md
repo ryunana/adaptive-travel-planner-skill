@@ -4,7 +4,7 @@
 
 ## 1. 结论
 
-**有条件通过。** 8 个前向场景的流程契约全部通过，8 份虚构 rank-1 日程全部通过确定性行程校验。无 Key、拒绝安装、伪 Key 失败、证据过期重验、长期潜力与本次适配分离、混合粒度归一化均符合 V2 规格。发现的脚本 UX、输入健壮性和评分语义问题均已修复并加入回归测试。
+**有条件通过。** 8 个前向场景的流程契约全部通过，8 份虚构 rank-1 日程全部通过确定性行程校验。无 Key、拒绝安装、伪 Key 失败、证据过期重验、长期潜力与本次适配分离、混合粒度归一化均符合 V2 规格。发现的脚本 UX、输入健壮性、评分语义、网络边界和发布安全问题均已修复并加入回归测试。
 
 动态来源相关检查受工具与凭据限制：没有可用 web-search/interactive-browser，也没有用户授权的有效 AMap Key，因此实时天气、交通库存、酒店、景点与成功 AMap live smoke 为 `untestable`。伪 Key 通过真实 AMap 请求得到了可重复的 `invalid_key` 失败证据。
 
@@ -35,14 +35,17 @@ $ cd adaptive-travel-planner-skill
 $ cp templates/traveler-profile.template.md references/traveler-profile.md
 $ git check-ignore references/traveler-profile.md
 references/traveler-profile.md
-$ ln -s "$(pwd)" ~/.codex/skills/adaptive-travel-planner
-$ readlink ~/.codex/skills/adaptive-travel-planner
+$ npx -y skills@latest add ryunana/adaptive-travel-planner-skill -g -a codex -y
+exit=0; installed=~/.agents/skills/adaptive-travel-planner; target=Codex
+$ mkdir -p ~/.agents/skills
+$ ln -s "$(pwd)" ~/.agents/skills/adaptive-travel-planner
+$ readlink ~/.agents/skills/adaptive-travel-planner
 /tmp/adaptive-travel-planner-v2-acceptance/adaptive-travel-planner-skill
 $ test -r templates/portable-prompt.template.md
 portable_prompt=readable
 ```
 
-命令全部成功；画像路径被 Git 忽略，Skill 链接和便携提示词可读。测试使用隔离的临时 HOME，没有改动用户配置。
+skills.sh 一行安装在隔离 HOME 中成功，基于当前公开 main；V2 合并发布后仍需重跑。当前本地 V2 树的官方 `.agents/skills` 手工链接也在全新隔离 HOME 中原样成功；画像路径被 Git 忽略，Skill 链接和便携提示词可读。README 同时链接 OpenAI 当前 Build Skills 文档并展示 skills.sh 徽章，没有改动用户配置。
 
 **发布状态限制：** README 的公开 clone 当前只能得到尚未包含 V2 的 `main`，因此“公开新用户取得 V2”在发布前不可测试；发布后必须重跑。
 
@@ -120,6 +123,8 @@ key_source=environment
 | 缺输入文件 | 2/2 JSON `invalid_input` |
 | 非法 JSON | 2/2 JSON `invalid_input` |
 | 合法 JSON、错误顶层/元素结构 | 4/4 非零退出且输出结构化 JSON，不再 traceback |
+| 嵌套状态、证据、活动结构与非有限权重 | 6/6 非零退出；stdout 单一标准 JSON；stderr 无 traceback |
+| 非正/非有限 timeout | 两个网络 CLI 共 10/10 exit 2 + JSON `invalid_arguments`；正有限 timeout 保持接受 |
 
 `--help` 是成功输出而非错误，保留 argparse 的文本帮助；所有实际错误路径均为结构化 JSON。
 
@@ -132,6 +137,12 @@ key_source=environment
 | B3 | Medium / Decision correctness | fixed | 相邻分数差比较会链式扩大平局组 | 改为与平局组最高分比较；回归 rank=`1,1,3` |
 | B4 | Medium / Confidence semantics | fixed | 缺证据被 coverage 与 authority 重复惩罚 | authority 只对已有记录求平均；1/9 verified 回归 value=.111 |
 | B5 | Medium / Reliability | fixed | geocode `location` 畸形时 traceback | 返回 `malformed_response` 且不继续 route/weather |
+| B6 | High / Contract | fixed | scorer 对数组状态/证据、非有限或布尔权重与分数可能 traceback 或错误接受 | 完整候选 shape、枚举与有限数值验证；CLI 回归输出标准 JSON |
+| B7 | High / Contract | fixed | itinerary 的非数组核心活动、数组证据状态与布尔活动上限可能 traceback 或错误接受 | 返回清晰 issue；动态来源/查询时间在提供时必须为非空字符串 |
+| B8 | High / Reliability | fixed | 两个 AMap CLI 接受非正或非有限 timeout | 共享正有限数值解析器在任何网络请求前 exit 2 拒绝 |
+| B9 | Medium / Reliability | fixed | HTTP 响应读取中断可能泄漏 traceback | `HTTPException` 映射为脱敏结构化 `network_error` |
+| B10 | Medium / Installability | fixed | Codex 安装目录过时且父目录不存在；发现元数据为截断残句 | 使用当前 `.agents/skills`、skills.sh 安装与完整 64 字符描述；发布检查验证边界和基本一致性 |
+| B11 | High / Supply chain | fixed | CI action 使用可变标签且 checkout 保留凭据 | 两个 job 均固定官方不可变版本并关闭凭据持久化；zizmor 无未抑制 finding |
 | I1 | Info / Release state | untestable | README 公网 clone 目前只能得到 main，不含 V2 | 发布后按同一走查重测 |
 
 ## 6. 已决策评分语义
@@ -173,17 +184,23 @@ level = high when value >= 0.8, medium when value >= 0.5, otherwise low
 
 ```text
 $ python3 -m unittest discover -s tests
-Ran 41 tests
+Ran 53 tests
 OK
 
 $ python3 scripts/release_checks.py
 release checks passed: metadata, 17 resources, links, privacy
 
+$ mypy scripts
+Success: no issues found in 8 source files
+
 $ python3 /tmp/adaptive-travel-planner-v2-acceptance/check_scenarios.py
 scenario_contract_pass=8/8
 itinerary_validation_pass=8/8
+
+$ uvx zizmor .github/workflows/ci.yml
+No findings to report
 ```
 
-评分语义回归验证 rank=`1,1,3`、tied=`true,true,false`、1/9 verified confidence=`coverage .111 / authority 1.0 / value .111`、无已有记录时 authority=`0.0`。AMap 畸形 location fixture 回归验证 geocode 阶段结构化 `malformed_response` 且不调用 route/weather。
+评分语义回归验证 rank=`1,1,3`、tied=`true,true,false`、1/9 verified confidence=`coverage .111 / authority 1.0 / value .111`、无已有记录时 authority=`0.0`。畸形候选/行程输入、布尔和非有限数值、timeout 边界、AMap 中断响应均有回归；所有 CLI 错误保持单一可解析 JSON、非零退出且 stderr 无 traceback。AMap 畸形 location fixture 回归验证 geocode 阶段结构化 `malformed_response` 且不调用 route/weather。
 
 仓库内容隐私扫描无命中；`git ls-remote --heads origin agent/china-destination-selection-v2` 无输出，确认未推送该分支。本次没有执行 push，也没有切换分支或改动 main。
