@@ -95,6 +95,14 @@ ONE_QUERY_UNKNOWN = (
     re.compile(r"查询失败(?:时|后)?.{0,24}(?:标为|标记为?)\s*`?unknown`?", re.IGNORECASE),
 )
 
+BINARY_ASSET_SIGNATURES = {
+    ".gif": (b"GIF87a", b"GIF89a"),
+    ".jpg": (b"\xff\xd8\xff",),
+    ".jpeg": (b"\xff\xd8\xff",),
+    ".png": (b"\x89PNG\r\n\x1a\n",),
+    ".webp": (b"RIFF",),
+}
+
 
 def _yaml_mapping(text: str, label: str):
     try:
@@ -225,10 +233,19 @@ def scan_privacy(root: Path, files: list[Path]) -> list[str]:
     issues = []
     for path in files:
         try:
-            text = path.read_text(encoding="utf-8")
+            data = path.read_bytes()
+            text = data.decode("utf-8")
         except UnicodeError:
-            issues.append(f"{path.relative_to(root)}: cannot decode tracked file as UTF-8")
-            continue
+            signatures = BINARY_ASSET_SIGNATURES.get(path.suffix.lower(), ())
+            is_webp = path.suffix.lower() == ".webp" and data[8:12] == b"WEBP"
+            if not any(data.startswith(signature) for signature in signatures) or (
+                path.suffix.lower() == ".webp" and not is_webp
+            ):
+                issues.append(f"{path.relative_to(root)}: cannot decode tracked file as UTF-8")
+                continue
+            # Preserve ASCII privacy canaries in image metadata while allowing
+            # standard binary image assets in the repository.
+            text = data.decode("latin-1")
         except OSError:
             issues.append(f"{path.relative_to(root)}: cannot read tracked file")
             continue
