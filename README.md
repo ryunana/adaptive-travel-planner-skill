@@ -128,7 +128,7 @@ mkdir -p ~/.agents/skills
 ln -s "$(pwd)" ~/.agents/skills/adaptive-travel-planner
 ```
 
-Hermes Agent 可将仓库放到或链接到 `$HERMES_HOME/skills/`，未自定义时通常是 `~/.hermes/skills/`。Claude Code 可按其当前文档放到 `~/.claude/skills/`。
+Hermes Agent 可将仓库放到或链接到 `$HERMES_HOME/skills/`，未自定义时通常是 `~/.hermes/skills/`。Claude Code 可按其当前文档放到 `~/.claude/skills/`。WorkBuddy 可放到用户级技能目录 `~/.workbuddy/skills/adaptive-travel-planner/`（目录名与 frontmatter `name` 一致，重启 WorkBuddy 生效）。
 
 不同 Agent 工具的 Skill 目录和格式可能变化，请以对应工具的当前官方文档为准。核心内容位于 `SKILL.md` 和 `references/`，可以按需要迁移。`agents/openai.yaml` 只用于 Codex 元数据发现，不代表这个 Skill 只能在 Codex 中使用。
 
