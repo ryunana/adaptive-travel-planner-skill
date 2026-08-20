@@ -1,5 +1,7 @@
 # Adaptive Travel Planner Skill
 
+![Adaptive Travel Planner 双语项目主视觉](assets/hero.png)
+
 [![skills.sh](https://skills.sh/b/ryunana/adaptive-travel-planner-skill)](https://skills.sh/ryunana/adaptive-travel-planner-skill)
 
 AI 推荐你去看风景，到了景区才发现下大雨，山也看不见。<br>

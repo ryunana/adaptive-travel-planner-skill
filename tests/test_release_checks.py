@@ -155,6 +155,24 @@ class ReleaseChecksTests(unittest.TestCase):
             issues = release_checks.scan_privacy(root, [unsafe])
             self.assertTrue(any("cannot decode" in issue or "key-like assigned value" in issue for issue in issues))
 
+    def test_privacy_scan_allows_binary_image_and_scans_ascii_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            safe = root / "safe.png"
+            safe.write_bytes(b"\x89PNG\r\n\x1a\n\x00\xff")
+            unsafe = root / "unsafe.png"
+            unsafe.write_bytes(
+                b"\x89PNG\r\n\x1a\n\x00\xffapi_key='" + (b"x" * 32) + b"'\n"
+            )
+
+            self.assertEqual(release_checks.scan_privacy(root, [safe]), [])
+            self.assertTrue(
+                any(
+                    "key-like assigned value" in issue
+                    for issue in release_checks.scan_privacy(root, [unsafe])
+                )
+            )
+
     def test_markdown_reference_links_and_fragments_are_checked(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
